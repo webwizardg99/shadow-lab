@@ -47,7 +47,7 @@ git clone https://github.com/webwizardg99/shadow-lab.git
 cd shadow-lab
 
 # 2. Install dependencies
-pip install fastapi uvicorn paramiko psutil bcrypt jinja2 python-multipart
+pip install -r requirements.txt
 
 # 3. Configure
 cp config.json.example config.json   # edit port, alert thresholds, subnet
