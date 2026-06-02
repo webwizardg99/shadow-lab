@@ -114,6 +114,7 @@ latest_stats: Dict[str, Any] = {}
 connected_clients: Dict[WebSocket, int] = {}  # ws -> user_id
 _prev_net: Dict[str, Dict] = {}
 _prev_time: Dict[str, float] = {}
+agent_connected: Set[str] = set()            # machine IDs with active agent WS
 
 # ── Network Watcher ───────────────────────────────────────────────────────────
 KNOWN_DEVICES_FILE = os.path.join(os.path.dirname(__file__), "known_devices.json")
@@ -320,6 +321,8 @@ async def _collect_loop():
         for machine in all_machines:
             m   = _adapt(machine)
             key = str(m["id"])
+            if key in agent_connected:
+                continue  # agent is pushing live data directly
             if m.get("local"):
                 raw = await loop.run_in_executor(None, _local_stats)
             else:
@@ -508,6 +511,62 @@ async def stats_ws(websocket: WebSocket):
             await websocket.receive_text()
     except (WebSocketDisconnect, Exception):
         connected_clients.pop(websocket, None)
+
+
+# ── Agent token generation ────────────────────────────────────────────────────
+
+@app.post("/api/machines/{machine_id}/token")
+async def generate_token(request: Request, machine_id: str):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    if not _get_machine(machine_id, user["id"]):
+        return JSONResponse({"error": "Nem található"}, status_code=404)
+    token = db.generate_agent_token(user["id"], int(machine_id))
+    return {"token": token}
+
+
+# ── Agent WebSocket ───────────────────────────────────────────────────────────
+
+@app.websocket("/ws/agent/{token}")
+async def agent_ws(websocket: WebSocket, token: str):
+    machine_row = db.get_machine_by_agent_token(token)
+    if not machine_row:
+        await websocket.close(code=4401)
+        return
+    machine_id = str(machine_row["id"])
+    await websocket.accept()
+    agent_connected.add(machine_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                raw = json.loads(data)
+            except Exception:
+                continue
+            raw = _net_rates(machine_id, raw)
+            raw["online"] = True
+            raw["alerts"] = _check_alerts(raw)
+            latest_stats[machine_id] = raw
+            payload = {machine_id: raw}
+            for ws, uid in list(connected_clients.items()):
+                if any(str(m["id"]) == machine_id for m in db.get_machines(uid)):
+                    try:
+                        await ws.send_json(payload)
+                    except Exception:
+                        connected_clients.pop(ws, None)
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        agent_connected.discard(machine_id)
+        latest_stats[machine_id] = {"online": False, "alerts": []}
+        offline_payload = {machine_id: {"online": False, "alerts": []}}
+        for ws, uid in list(connected_clients.items()):
+            if any(str(m["id"]) == machine_id for m in db.get_machines(uid)):
+                try:
+                    await ws.send_json(offline_payload)
+                except Exception:
+                    connected_clients.pop(ws, None)
 
 
 # ── Network map ───────────────────────────────────────────────────────────────

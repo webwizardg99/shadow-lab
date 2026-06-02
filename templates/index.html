@@ -1595,13 +1595,20 @@ async function openManageMachines() {
     list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">No machines yet. Add one!</div>';
   } else {
     list.innerHTML = data.machines.map(m => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.8rem;">
-        <div>
-          <div style="font-weight:600;color:var(--text);">${m.label}</div>
-          <div style="color:var(--muted);font-size:.72rem;">${m.host}${m.local ? ' · local' : ''}</div>
+      <div style="border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;font-size:.8rem;">
+          <div>
+            <div style="font-weight:600;color:var(--text);">${m.label}</div>
+            <div style="color:var(--muted);font-size:.72rem;">${m.host}${m.local ? ' · local' : ''}</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="getAgentToken(${m.id}, this)"
+              style="background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:4px;padding:2px 10px;cursor:pointer;font-size:.72rem;">🔑 Token</button>
+            <button onclick="deleteMachine(${m.id})"
+              style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:2px 10px;cursor:pointer;font-size:.72rem;">Delete</button>
+          </div>
         </div>
-        <button onclick="deleteMachine(${m.id})"
-          style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:2px 10px;cursor:pointer;font-size:.72rem;">Delete</button>
+        <div id="token-panel-${m.id}" style="display:none;padding:0 16px 12px;"></div>
       </div>`).join('');
   }
   new bootstrap.Modal(document.getElementById('manageMachinesModal')).show();
@@ -1611,6 +1618,33 @@ async function deleteMachine(id) {
   if (!confirm('Delete this machine?')) return;
   await fetch('/api/machines/' + id, {method: 'DELETE'});
   location.reload();
+}
+
+async function getAgentToken(id, btn) {
+  const panel = document.getElementById('token-panel-' + id);
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  btn.textContent = '…';
+  const res  = await fetch('/api/machines/' + id + '/token', {method: 'POST'});
+  const data = await res.json();
+  btn.textContent = '🔑 Token';
+  if (!data.token) { alert('Error generating token'); return; }
+  const server = location.origin.replace(/^http/, 'ws');
+  const cmd = `python3 agent.py --server ${server} --token ${data.token}`;
+  panel.innerHTML = `
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:.72rem;">
+      <div style="color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-size:.62rem;">Agent token — keep secret</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+        <code style="flex:1;background:#0d1117;padding:4px 8px;border-radius:4px;color:#a78bfa;word-break:break-all;">${data.token}</code>
+        <button onclick="navigator.clipboard.writeText('${data.token}')" style="background:var(--accent);border:none;color:#fff;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:.7rem;flex-shrink:0;">Copy</button>
+      </div>
+      <div style="color:var(--muted);margin-bottom:4px;font-size:.62rem;text-transform:uppercase;letter-spacing:1px;">Run on your machine</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <code style="flex:1;background:#0d1117;padding:4px 8px;border-radius:4px;color:#3fb950;word-break:break-all;">${cmd}</code>
+        <button onclick="navigator.clipboard.writeText(\`${cmd}\`)" style="background:var(--accent);border:none;color:#fff;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:.7rem;flex-shrink:0;">Copy</button>
+      </div>
+      <div style="color:var(--muted);margin-top:6px;font-size:.65rem;">pip install psutil websockets &nbsp;·&nbsp; Each click generates a new token</div>
+    </div>`;
+  panel.style.display = 'block';
 }
 
 function showUpgrade() {

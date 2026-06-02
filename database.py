@@ -25,14 +25,15 @@ def init_db():
                 created  INTEGER NOT NULL DEFAULT (strftime('%s','now'))
             );
             CREATE TABLE IF NOT EXISTS machines (
-                id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                label     TEXT    NOT NULL,
-                host      TEXT    NOT NULL,
-                ssh_user  TEXT,
-                ssh_pass  TEXT,
-                mac       TEXT,
-                is_local  INTEGER NOT NULL DEFAULT 0
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                label       TEXT    NOT NULL,
+                host        TEXT    NOT NULL,
+                ssh_user    TEXT,
+                ssh_pass    TEXT,
+                mac         TEXT,
+                is_local    INTEGER NOT NULL DEFAULT 0,
+                agent_token TEXT    UNIQUE
             );
             CREATE TABLE IF NOT EXISTS sessions (
                 token    TEXT    PRIMARY KEY,
@@ -40,6 +41,13 @@ def init_db():
                 created  INTEGER NOT NULL DEFAULT (strftime('%s','now'))
             );
         """)
+    # Migrate existing DBs that don't have agent_token yet
+    try:
+        with _conn() as c:
+            c.execute("ALTER TABLE machines ADD COLUMN agent_token TEXT")
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_token ON machines(agent_token)")
+    except Exception:
+        pass
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -147,6 +155,26 @@ def update_machine(user_id: int, machine_id: int, **kwargs):
             f"UPDATE machines SET {sets} WHERE id=? AND user_id=?",
             (*fields.values(), machine_id, user_id)
         )
+
+
+# ── Agent tokens ─────────────────────────────────────────────────────────────
+
+def generate_agent_token(user_id: int, machine_id: int) -> Optional[str]:
+    token = secrets.token_urlsafe(32)
+    with _conn() as c:
+        rows = c.execute(
+            "UPDATE machines SET agent_token=? WHERE id=? AND user_id=?",
+            (token, machine_id, user_id)
+        ).rowcount
+    return token if rows > 0 else None
+
+
+def get_machine_by_agent_token(token: str) -> Optional[Dict]:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM machines WHERE agent_token=?", (token,)
+        ).fetchone()
+    return dict(row) if row else None
 
 
 # ── Tier helpers ─────────────────────────────────────────────────────────────
