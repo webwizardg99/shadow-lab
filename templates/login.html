@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shadow Lab — Login</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0d1117;color:#c9d1d9;font-family:'Consolas','Monaco',monospace;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.box{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:40px 36px;width:100%;max-width:380px;}
+.logo{text-align:center;font-size:1.5rem;font-weight:700;letter-spacing:4px;color:#8b5cf6;margin-bottom:6px;}
+.logo span{color:#a78bfa;}
+.sub{text-align:center;font-size:.75rem;color:#8b949e;margin-bottom:28px;}
+label{font-size:.7rem;color:#8b949e;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;}
+input{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:8px 12px;font-family:inherit;font-size:.9rem;outline:none;transition:.15s;margin-bottom:16px;}
+input:focus{border-color:#8b5cf6;}
+button{width:100%;background:#7c3aed;border:none;border-radius:6px;color:#fff;padding:9px;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;letter-spacing:1px;transition:.15s;margin-top:4px;}
+button:hover{background:#6d28d9;}
+.err{background:#f8514922;border:1px solid #f85149;border-radius:6px;color:#f85149;font-size:.78rem;padding:8px 12px;margin-bottom:16px;}
+.footer{text-align:center;font-size:.75rem;color:#8b949e;margin-top:20px;}
+.footer a{color:#8b5cf6;text-decoration:none;}
+.footer a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo">◈ <span>SHADOW</span> LAB</div>
+  <div class="sub">Infrastructure Dashboard — Sign In</div>
+  {% if error %}
+  <div class="err">⚠ {{ error }}</div>
+  {% endif %}
+  <form method="post" action="/login">
+    <label>Username or Email</label>
+    <input type="text" name="username" autofocus autocomplete="username">
+    <label>Password</label>
+    <input type="password" name="password" autocomplete="current-password">
+    <button type="submit">Sign In →</button>
+  </form>
+  <div class="footer">No account? <a href="/register">Register free</a></div>
+</div>
+</body>
+</html>

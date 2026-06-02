@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shadow Lab — Register</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0d1117;color:#c9d1d9;font-family:'Consolas','Monaco',monospace;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.box{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:40px 36px;width:100%;max-width:400px;}
+.logo{text-align:center;font-size:1.5rem;font-weight:700;letter-spacing:4px;color:#8b5cf6;margin-bottom:6px;}
+.logo span{color:#a78bfa;}
+.sub{text-align:center;font-size:.75rem;color:#8b949e;margin-bottom:28px;}
+label{font-size:.7rem;color:#8b949e;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;}
+input{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:8px 12px;font-family:inherit;font-size:.9rem;outline:none;transition:.15s;margin-bottom:16px;}
+input:focus{border-color:#8b5cf6;}
+button{width:100%;background:#7c3aed;border:none;border-radius:6px;color:#fff;padding:9px;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;letter-spacing:1px;transition:.15s;margin-top:4px;}
+button:hover{background:#6d28d9;}
+.err{background:#f8514922;border:1px solid #f85149;border-radius:6px;color:#f85149;font-size:.78rem;padding:8px 12px;margin-bottom:16px;}
+.tiers{display:flex;gap:10px;margin-bottom:24px;}
+.tier{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:14px 12px;text-align:center;}
+.tier.pro{border-color:#8b5cf6;}
+.tier-name{font-size:.8rem;font-weight:700;letter-spacing:2px;margin-bottom:6px;}
+.tier-price{font-size:1.1rem;font-weight:700;color:#8b5cf6;margin-bottom:8px;}
+.tier-features{font-size:.68rem;color:#8b949e;line-height:1.6;}
+.badge{display:inline-block;background:#7c3aed;color:#fff;font-size:.6rem;padding:2px 6px;border-radius:4px;letter-spacing:1px;vertical-align:middle;}
+.footer{text-align:center;font-size:.75rem;color:#8b949e;margin-top:20px;}
+.footer a{color:#8b5cf6;text-decoration:none;}
+.footer a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo">◈ <span>SHADOW</span> LAB</div>
+  <div class="sub">Create your account — free to start</div>
+
+  <div class="tiers">
+    <div class="tier">
+      <div class="tier-name" style="color:#8b949e;">FREE</div>
+      <div class="tier-price" style="color:#8b949e;">$0</div>
+      <div class="tier-features">
+        Live monitoring<br>CPU / RAM / Disk<br>Network map<br>Up to 3 machines
+      </div>
+    </div>
+    <div class="tier pro">
+      <div class="tier-name" style="color:#a78bfa;">PRO <span class="badge">SOON</span></div>
+      <div class="tier-price">$9/mo</div>
+      <div class="tier-features">
+        Everything in Free<br>SSH terminal<br>Nmap scanner<br>Process manager<br>File browser<br>Up to 10 machines
+      </div>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="err">⚠ {{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="/register">
+    <label>Email</label>
+    <input type="email" name="email" autofocus autocomplete="email" placeholder="you@example.com">
+    <label>Username</label>
+    <input type="text" name="username" autocomplete="username" placeholder="yourname">
+    <label>Password (min. 8 chars)</label>
+    <input type="password" name="password" autocomplete="new-password">
+    <label>Confirm Password</label>
+    <input type="password" name="password2" autocomplete="new-password">
+    <button type="submit">Create Free Account →</button>
+  </form>
+
+  <div class="footer">Already have an account? <a href="/login">Sign in</a></div>
+</div>
+</body>
+</html>

