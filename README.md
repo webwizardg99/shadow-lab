@@ -34,7 +34,7 @@ Multi-tenant infrastructure monitoring dashboard — SaaS-ready, built with Fast
 | Database | SQLite (multi-tenant) |
 | Auth | bcrypt + session cookies |
 | Frontend | Vanilla JS + Bootstrap 5 + Chart.js |
-| Stats | psutil (local) / Paramiko SSH (remote) |
+| Stats | psutil (local) / Paramiko SSH (remote) / Agent WS |
 | Real-time | WebSockets |
 
 ---
@@ -83,7 +83,69 @@ Open `http://localhost:8889` — register a free account and add your first mach
 
 **Local machine** — check *"This is the local machine"* when adding. Stats are collected directly via `psutil`.
 
-**Remote machine** — provide the IP/hostname and SSH credentials. Shadow Lab connects over SSH and runs a lightweight stats script remotely.
+**Remote machine (SSH)** — provide the IP/hostname and SSH credentials. Shadow Lab connects over SSH and runs a lightweight stats script remotely.
+
+**Remote machine (Agent)** — recommended for machines behind NAT or firewalls. The agent connects *outbound* to Shadow Lab, no inbound ports required.
+
+---
+
+## Agent
+
+The agent is a standalone Python script that runs on any monitored machine and streams stats to Shadow Lab over a persistent WebSocket.
+
+```
+Your machine  ──── WebSocket (outbound) ────▶  Shadow Lab server
+   agent.py                                       /ws/agent/{token}
+```
+
+### Setup
+
+**1. Generate a token** — in the dashboard, open ⚙ Manage, click **🔑 Token** next to a machine. Copy the ready-made command.
+
+**2. Install dependencies on the monitored machine:**
+
+```bash
+pip install psutil websockets
+```
+
+**3. Run the agent:**
+
+```bash
+python3 agent.py --server ws://your-shadowlab-host:8889 --token YOUR_TOKEN
+```
+
+Or with environment variables:
+
+```bash
+export SHADOWLAB_SERVER=ws://your-shadowlab-host:8889
+export SHADOWLAB_TOKEN=YOUR_TOKEN
+python3 agent.py
+```
+
+The agent reconnects automatically with exponential backoff if the connection drops. The dashboard shows ONLINE/OFFLINE in real time.
+
+### Run as a systemd service
+
+```ini
+# /etc/systemd/system/shadowlab-agent.service
+[Unit]
+Description=Shadow Lab Agent
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/shadowlab/agent.py
+Environment=SHADOWLAB_SERVER=ws://your-shadowlab-host:8889
+Environment=SHADOWLAB_TOKEN=YOUR_TOKEN
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl enable --now shadowlab-agent
+```
 
 ---
 
@@ -101,14 +163,17 @@ Open `http://localhost:8889` — register a free account and add your first mach
 
 ```
 shadow-lab/
-├── main.py          # FastAPI app, routes, WebSocket broadcast
-├── database.py      # SQLite helpers (users, machines, sessions)
-├── config.json      # Local config (gitignored)
+├── main.py               # FastAPI app, routes, WebSocket broadcast
+├── database.py           # SQLite helpers (users, machines, sessions, agent tokens)
+├── agent.py              # Standalone agent — runs on monitored machines
+├── config.json           # Local config (gitignored)
+├── config.json.example   # Config template
+├── requirements.txt      # Python dependencies
 ├── templates/
-│   ├── index.html   # Dashboard (Jinja2)
+│   ├── index.html        # Dashboard (Jinja2)
 │   ├── login.html
 │   └── register.html
-└── start.sh         # Convenience launcher
+└── start.sh              # Convenience launcher
 ```
 
 ---
