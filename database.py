@@ -1,7 +1,7 @@
 import sqlite3
-import hashlib
 import secrets
 import os
+import bcrypt
 from typing import Optional, List, Dict
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "shadowlab.db")
@@ -45,7 +45,11 @@ def init_db():
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 def _hash(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def _verify(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
 def register_user(email: str, username: str, password: str) -> Optional[Dict]:
@@ -63,10 +67,12 @@ def register_user(email: str, username: str, password: str) -> Optional[Dict]:
 def authenticate(email_or_user: str, password: str) -> Optional[Dict]:
     with _conn() as c:
         row = c.execute(
-            "SELECT * FROM users WHERE (email=? OR username=?) AND password=?",
-            (email_or_user.lower(), email_or_user, _hash(password))
+            "SELECT * FROM users WHERE email=? OR username=?",
+            (email_or_user.lower(), email_or_user)
         ).fetchone()
-    return dict(row) if row else None
+    if row and _verify(password, row["password"]):
+        return dict(row)
+    return None
 
 
 def create_session(user_id: int) -> str:

@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import shlex
 import socket
 import stat
 import time
@@ -828,7 +829,7 @@ async def get_logs(request: Request, machine_id: str,
     lines = max(10, min(lines, 1000))
     cmd = (f"journalctl -n {lines} --no-pager --output=short-iso 2>/dev/null"
            if file == "journalctl"
-           else f"tail -n {lines} '{file}' 2>&1")
+           else f"tail -n {lines} {shlex.quote(file)} 2>&1")
 
     machine = _get_machine(machine_id, user["id"])
     if not machine:
@@ -1156,7 +1157,7 @@ async def control_service(request: Request, machine_id: str, payload: Dict = Bod
         return {"error": "Érvénytelen paraméterek"}
 
     pw  = machine.get("password", "")
-    cmd = f"echo '{pw}' | sudo -S systemctl {action} {name}.service 2>&1; echo EXIT:$?"
+    cmd = f"echo {shlex.quote(pw)} | sudo -S systemctl {action} {name}.service 2>&1; echo EXIT:$?"
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, lambda: _run_on_machine(machine, cmd, 20))
 
