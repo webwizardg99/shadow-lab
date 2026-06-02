@@ -430,7 +430,7 @@ async def logout(request: Request):
 async def dashboard(request: Request):
     user = _get_user(request)
     if not user:
-        return RedirectResponse("/login", status_code=302)
+        return templates.TemplateResponse(request, "landing.html", {})
     machines = _machines_dict(user["id"])
     return templates.TemplateResponse(request, "index.html", {
         "machines": machines,
