@@ -1,0 +1,10 @@
+{
+    "port": 8889,
+    "alerts": {
+        "cpu":  85,
+        "ram":  90,
+        "disk": 90,
+        "temp": 80
+    },
+    "network_subnet": "192.168.1.0/24"
+}
