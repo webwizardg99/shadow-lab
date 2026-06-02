@@ -1,0 +1,12 @@
+[Unit]
+Description=Shadow Lab — Infrastructure Monitoring Dashboard
+After=network.target
+
+[Service]
+WorkingDirectory=%h/shadow-lab
+ExecStart=/usr/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8889
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

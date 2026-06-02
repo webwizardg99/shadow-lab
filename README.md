@@ -58,6 +58,23 @@ python3 -m uvicorn main:app --host 0.0.0.0 --port 8889
 
 Open `http://localhost:8889` — register a free account and add your first machine.
 
+### Run as a systemd user service (auto-start on login)
+
+```bash
+# Copy the service file
+mkdir -p ~/.config/systemd/user
+cp shadowlab.service ~/.config/systemd/user/
+
+# Enable and start
+systemctl --user daemon-reload
+systemctl --user enable --now shadowlab
+
+# Useful commands
+systemctl --user status shadowlab      # check status
+systemctl --user restart shadowlab     # restart
+journalctl --user -u shadowlab -f      # live log
+```
+
 ---
 
 ## Configuration
@@ -169,6 +186,7 @@ shadow-lab/
 ├── config.json           # Local config (gitignored)
 ├── config.json.example   # Config template
 ├── requirements.txt      # Python dependencies
+├── shadowlab.service     # systemd user service
 ├── templates/
 │   ├── index.html        # Dashboard (Jinja2)
 │   ├── login.html
