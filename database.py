@@ -273,17 +273,24 @@ def get_ai_task(tid: str) -> Optional[Dict]:
 
 
 def update_ai_task(tid: str, **kwargs) -> bool:
-    allowed = {"status", "result", "model", "machine", "elapsed"}
-    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    _COLS = {"status", "result", "model", "machine", "elapsed"}
+    fields = {k: v for k, v in kwargs.items() if k in _COLS}
     if not fields:
         return False
-    fields["updated"] = int(__import__("time").time())
-    sets = ", ".join(f"{k}=?" for k in fields)
+    now = int(__import__("time").time())
+    # Build query from a static allowlist — no user-controlled column names reach SQL
+    col_clauses = {
+        "status":  "status=?",
+        "result":  "result=?",
+        "model":   "model=?",
+        "machine": "machine=?",
+        "elapsed": "elapsed=?",
+    }
+    parts = [col_clauses[k] for k in fields]
+    parts.append("updated=?")
+    sql = "UPDATE ai_tasks SET " + ", ".join(parts) + " WHERE id=?"
     with _conn() as c:
-        rows = c.execute(
-            f"UPDATE ai_tasks SET {sets} WHERE id=?",
-            (*fields.values(), tid)
-        ).rowcount
+        rows = c.execute(sql, (*fields.values(), now, tid)).rowcount
     return rows > 0
 
 

@@ -1470,8 +1470,8 @@ async def bots_status(request: Request):
         import urllib.request as _ur
         with _ur.urlopen("http://127.0.0.1:51823/status", timeout=3) as r:
             return JSONResponse(content=json.loads(r.read()))
-    except Exception as e:
-        return {"error": str(e), "bots": {}}
+    except Exception:
+        return {"error": "ShadowBot manager unreachable", "bots": {}}
 
 
 @app.get("/api/bots/sitrep")
