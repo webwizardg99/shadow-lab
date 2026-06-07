@@ -186,3 +186,192 @@ def is_pro(user: Dict) -> bool:
 def set_tier(user_id: int, tier: str):
     with _conn() as c:
         c.execute("UPDATE users SET tier=? WHERE id=?", (tier, user_id))
+
+
+# ── ShadowBridge extensions ───────────────────────────────────────────────────
+
+def init_shadowbridge_tables():
+    with _conn() as c:
+        c.executescript("""
+            CREATE TABLE IF NOT EXISTS ai_tasks (
+                id       TEXT    PRIMARY KEY,
+                type     TEXT    NOT NULL DEFAULT 'general',
+                prompt   TEXT    NOT NULL,
+                system   TEXT    DEFAULT '',
+                target   TEXT    DEFAULT 'any',
+                status   TEXT    NOT NULL DEFAULT 'pending',
+                result   TEXT,
+                model    TEXT,
+                machine  TEXT,
+                elapsed  REAL,
+                created  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+                updated  INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+            );
+            CREATE TABLE IF NOT EXISTS sb_alerts (
+                id        TEXT    PRIMARY KEY,
+                type      TEXT    NOT NULL,
+                severity  TEXT    NOT NULL DEFAULT 'info',
+                machine   TEXT,
+                message   TEXT    NOT NULL,
+                data      TEXT,
+                ack       INTEGER NOT NULL DEFAULT 0,
+                created   INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+            );
+            CREATE TABLE IF NOT EXISTS recon_results (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                machine   TEXT    NOT NULL,
+                mode      TEXT    NOT NULL,
+                score     INTEGER NOT NULL,
+                subnet    TEXT,
+                host_count INTEGER,
+                evidence  TEXT,
+                raw       TEXT,
+                created   INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+            );
+            CREATE TABLE IF NOT EXISTS telegram_config (
+                id      INTEGER PRIMARY KEY DEFAULT 1,
+                token   TEXT,
+                chat_id TEXT,
+                enabled INTEGER NOT NULL DEFAULT 0
+            );
+            INSERT OR IGNORE INTO telegram_config (id) VALUES (1);
+        """)
+
+
+# ── AI Tasks (persistent) ─────────────────────────────────────────────────────
+
+def create_ai_task(tid: str, task_type: str, prompt: str,
+                   system: str = "", target: str = "any") -> Dict:
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO ai_tasks (id,type,prompt,system,target) VALUES (?,?,?,?,?)",
+            (tid, task_type, prompt, system, target)
+        )
+    return get_ai_task(tid)
+
+
+def get_ai_task(tid: str) -> Optional[Dict]:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM ai_tasks WHERE id=?", (tid,)).fetchone()
+    return dict(row) if row else None
+
+
+def update_ai_task(tid: str, **kwargs) -> bool:
+    allowed = {"status", "result", "model", "machine", "elapsed"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if not fields:
+        return False
+    fields["updated"] = int(__import__("time").time())
+    sets = ", ".join(f"{k}=?" for k in fields)
+    with _conn() as c:
+        rows = c.execute(
+            f"UPDATE ai_tasks SET {sets} WHERE id=?",
+            (*fields.values(), tid)
+        ).rowcount
+    return rows > 0
+
+
+def list_ai_tasks(limit: int = 50) -> List[Dict]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM ai_tasks ORDER BY created DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def next_ai_task(machine: str = "any") -> Optional[Dict]:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM ai_tasks WHERE status='pending' AND (target='any' OR target=?) "
+            "ORDER BY created ASC LIMIT 1", (machine,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+# ── Alerts ────────────────────────────────────────────────────────────────────
+
+def create_alert(alert_type: str, message: str, severity: str = "info",
+                 machine: str = None, data: dict = None) -> Dict:
+    import time, json
+    tid = secrets.token_hex(6)
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO sb_alerts (id,type,severity,machine,message,data) VALUES (?,?,?,?,?,?)",
+            (tid, alert_type, severity, machine, message,
+             json.dumps(data) if data else None)
+        )
+    return {"id": tid, "type": alert_type, "severity": severity,
+            "machine": machine, "message": message}
+
+
+def list_alerts(limit: int = 100, unacked_only: bool = False) -> List[Dict]:
+    import json
+    q = "SELECT * FROM sb_alerts"
+    if unacked_only:
+        q += " WHERE ack=0"
+    q += " ORDER BY created DESC LIMIT ?"
+    with _conn() as c:
+        rows = c.execute(q, (limit,)).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        if d.get("data"):
+            try:
+                d["data"] = json.loads(d["data"])
+            except Exception:
+                pass
+        result.append(d)
+    return result
+
+
+def ack_alert(alert_id: str):
+    with _conn() as c:
+        c.execute("UPDATE sb_alerts SET ack=1 WHERE id=?", (alert_id,))
+
+
+# ── Recon results ─────────────────────────────────────────────────────────────
+
+def save_recon(machine: str, mode: str, score: int, subnet: str,
+               host_count: int, evidence: list, raw: dict):
+    import json
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO recon_results (machine,mode,score,subnet,host_count,evidence,raw) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (machine, mode, score, subnet, host_count,
+             json.dumps(evidence), json.dumps(raw))
+        )
+
+
+def latest_recon(machine: str) -> Optional[Dict]:
+    import json
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM recon_results WHERE machine=? ORDER BY created DESC LIMIT 1",
+            (machine,)
+        ).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    for key in ("evidence", "raw"):
+        try:
+            d[key] = json.loads(d[key]) if d[key] else None
+        except Exception:
+            pass
+    return d
+
+
+# ── Telegram config ───────────────────────────────────────────────────────────
+
+def get_telegram_config() -> Dict:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM telegram_config WHERE id=1").fetchone()
+    return dict(row) if row else {}
+
+
+def set_telegram_config(token: str, chat_id: str, enabled: bool = True):
+    with _conn() as c:
+        c.execute(
+            "UPDATE telegram_config SET token=?, chat_id=?, enabled=? WHERE id=1",
+            (token, chat_id, int(enabled))
+        )

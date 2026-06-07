@@ -25,6 +25,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
 import database as db
+from shadowbridge_telegram import TelegramDispatcher, send_alert as tg_send_alert
 
 # ── Config ───────────────────────────────────────────────────────────────────
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
@@ -353,8 +354,15 @@ async def _collect_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+    db.init_shadowbridge_tables()
     task1 = asyncio.create_task(_collect_loop())
     task2 = asyncio.create_task(_network_watcher_loop())
+    _tg_dispatcher = TelegramDispatcher(
+        get_config_fn=db.get_telegram_config,
+        list_alerts_fn=lambda: db.list_alerts(unacked_only=True),
+        ack_fn=db.ack_alert,
+    )
+    _tg_dispatcher.start()
     yield
     task1.cancel()
     task2.cancel()
@@ -1311,78 +1319,140 @@ async def account_info(request: Request):
 
 # ── ShadowBridge AI Orchestration ────────────────────────────────────────────
 
-_ai_tasks: dict = {}   # in-memory store; swap for DB when scaling
-
-
-def _new_task_id() -> str:
-    return uuid.uuid4().hex[:12]
+def _auth_agent_or_user(request: Request) -> bool:
+    return bool(_get_user(request) or request.headers.get("X-Agent-Token"))
 
 
 @app.post("/api/ai/task")
 async def ai_task_create(request: Request, payload: Dict = Body(...)):
-    user = _get_user(request)
-    agent_token = request.headers.get("X-Agent-Token", "")
-    if not user and not agent_token:
+    if not _auth_agent_or_user(request):
         return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
-
-    tid = _new_task_id()
-    _ai_tasks[tid] = {
-        "id":      tid,
-        "type":    payload.get("type", "general"),
-        "prompt":  payload.get("prompt", ""),
-        "system":  payload.get("system", ""),
-        "target":  payload.get("target", "any"),
-        "status":  "pending",
-        "result":  None,
-        "model":   None,
-        "machine": None,
-        "elapsed": None,
-        "created": int(time.time()),
-    }
+    tid  = uuid.uuid4().hex[:12]
+    task = db.create_ai_task(
+        tid,
+        task_type=payload.get("type", "general"),
+        prompt=payload.get("prompt", ""),
+        system=payload.get("system", ""),
+        target=payload.get("target", "any"),
+    )
     return {"id": tid, "status": "pending"}
 
 
 @app.get("/api/ai/task/next")
 async def ai_task_next(request: Request, machine: str = "any"):
-    token = request.headers.get("X-Agent-Token", "")
-    if not token:
+    if not request.headers.get("X-Agent-Token"):
         return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
-    for tid, task in _ai_tasks.items():
-        if task["status"] == "pending":
-            if task["target"] in ("any", machine):
-                return task
-    return {}
+    task = db.next_ai_task(machine)
+    return task or {}
 
 
 @app.get("/api/ai/task/{tid}")
 async def ai_task_get(request: Request, tid: str):
-    user = _get_user(request)
-    token = request.headers.get("X-Agent-Token", "")
-    if not user and not token:
+    if not _auth_agent_or_user(request):
         return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
-    task = _ai_tasks.get(tid)
-    if not task:
-        return JSONResponse({"error": "Nem található"}, status_code=404)
-    return task
+    task = db.get_ai_task(tid)
+    return task or JSONResponse({"error": "Nem található"}, status_code=404)
 
 
 @app.patch("/api/ai/task/{tid}")
 async def ai_task_update(request: Request, tid: str, payload: Dict = Body(...)):
-    token = request.headers.get("X-Agent-Token", "")
-    if not token:
+    if not request.headers.get("X-Agent-Token"):
         return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
-    task = _ai_tasks.get(tid)
-    if not task:
-        return JSONResponse({"error": "Nem található"}, status_code=404)
-    task.update({k: v for k, v in payload.items() if k in
-                 ("status", "result", "model", "machine", "elapsed")})
-    return {"ok": True}
+    ok = db.update_ai_task(tid, **payload)
+    return {"ok": ok} if ok else JSONResponse({"error": "Nem található"}, status_code=404)
 
 
 @app.get("/api/ai/tasks")
 async def ai_task_list(request: Request):
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    return {"tasks": db.list_ai_tasks(50)}
+
+
+# ── ShadowBridge Alerts ───────────────────────────────────────────────────────
+
+@app.post("/api/sb/alert")
+async def sb_alert_create(request: Request, payload: Dict = Body(...)):
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    alert = db.create_alert(
+        alert_type=payload.get("type", "unknown"),
+        message=payload.get("message", ""),
+        severity=payload.get("severity", "info"),
+        machine=payload.get("machine") or request.headers.get("X-Machine-ID"),
+        data=payload.get("data"),
+    )
+    return {"ok": True, "id": alert["id"]}
+
+
+@app.get("/api/sb/alerts")
+async def sb_alert_list(request: Request, unacked: str = "0"):
     user = _get_user(request)
     if not user:
         return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
-    tasks = sorted(_ai_tasks.values(), key=lambda t: t["created"], reverse=True)
-    return {"tasks": tasks[:50]}
+    return {"alerts": db.list_alerts(100, unacked_only=(unacked == "1"))}
+
+
+@app.post("/api/sb/alerts/{alert_id}/ack")
+async def sb_alert_ack(request: Request, alert_id: str):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    db.ack_alert(alert_id)
+    return {"ok": True}
+
+
+# ── ShadowBridge Recon ────────────────────────────────────────────────────────
+
+@app.post("/api/sb/recon")
+async def sb_recon_save(request: Request, payload: Dict = Body(...)):
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    machine = payload.get("machine") or request.headers.get("X-Machine-ID", "unknown")
+    db.save_recon(
+        machine=machine,
+        mode=payload.get("mode", "home"),
+        score=payload.get("corp_score", 0),
+        subnet=payload.get("subnet", ""),
+        host_count=payload.get("host_count", 0),
+        evidence=payload.get("evidence", []),
+        raw=payload,
+    )
+    return {"ok": True}
+
+
+@app.get("/api/sb/recon/{machine}")
+async def sb_recon_get(request: Request, machine: str):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    result = db.latest_recon(machine)
+    return result or {"mode": "unknown", "score": 0}
+
+
+# ── ShadowBridge Telegram Config ─────────────────────────────────────────────
+
+@app.get("/api/sb/telegram")
+async def sb_telegram_get(request: Request):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    cfg = db.get_telegram_config()
+    return {"enabled": bool(cfg.get("enabled")), "chat_id": cfg.get("chat_id", ""),
+            "configured": bool(cfg.get("token"))}
+
+
+@app.post("/api/sb/telegram")
+async def sb_telegram_set(request: Request, payload: Dict = Body(...)):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    token   = payload.get("token", "").strip()
+    chat_id = payload.get("chat_id", "").strip()
+    enabled = bool(payload.get("enabled", True))
+    if not token or not chat_id:
+        return {"error": "token és chat_id kötelező"}
+    db.set_telegram_config(token, chat_id, enabled)
+    db.create_alert("telegram.configured", "Telegram alerting configured",
+                    severity="info")
+    return {"ok": True}

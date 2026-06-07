@@ -95,6 +95,22 @@ def _api(method: str, path: str, body: dict = None) -> dict:
         return {"error": str(e)}
 
 
+def _run_recon_and_report():
+    """Run recon on startup and report mode to dashboard."""
+    try:
+        import subprocess, json as _json
+        result = subprocess.run(
+            [sys.executable, os.path.join(os.path.dirname(__file__), "shadowbridge_recon.py")],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            data = _json.loads(result.stdout)
+            _api("POST", "/api/sb/recon", data)
+            log.info(f"Recon complete: mode={data.get('mode')} score={data.get('corp_score')}")
+    except Exception as e:
+        log.warning(f"Recon skipped: {e}")
+
+
 def poll_and_execute():
     log.info(f"ShadowBridge Agent starting on {MACHINE_ID}")
     available = _ollama_models()
@@ -102,6 +118,14 @@ def poll_and_execute():
     if not available:
         log.error("No Ollama models found — is Ollama running?")
         sys.exit(1)
+
+    _api("POST", "/api/sb/alert", {
+        "type": "agent.online", "severity": "info",
+        "machine": MACHINE_ID,
+        "message": f"Agent online on {MACHINE_ID} | models: {', '.join(available[:3])}",
+    })
+
+    _run_recon_and_report()
 
     while True:
         try:
