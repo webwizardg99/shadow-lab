@@ -1,8 +1,9 @@
-// ShadowGuard Android App
+// ShadowGuard — Android only. No iOS. No Windows.
 // Minimal UI — web dashboard a localhost:8888-on, natív WiFi scan + alert
 //
 // Fordítás: flutter build apk --release
-// Függőségek: pubspec.yaml-ban (wifi_scan, permission_handler, flutter_local_notifications)
+//           flutter build apk --split-per-abi   (kisebb APK méret)
+// Függőségek: pubspec.yaml (wifi_scan, permission_handler, flutter_local_notifications)
 
 import 'dart:async';
 import 'dart:convert';

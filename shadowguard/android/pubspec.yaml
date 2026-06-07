@@ -29,3 +29,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Android only — iOS deliberately excluded
+  platforms:
+    android:

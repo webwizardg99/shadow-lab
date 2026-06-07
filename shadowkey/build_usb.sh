@@ -36,8 +36,9 @@ for dep in lb debootstrap xorriso mksquashfs; do
 done
 
 echo "==> ShadowKey USB Builder"
-echo "    Output: $OUTPUT"
-echo "    Source: $REPO_DIR"
+echo "    Platform : Linux x86_64 (Windows not supported — by design)"
+echo "    Output   : $OUTPUT"
+echo "    Source   : $REPO_DIR"
 echo ""
 
 # ── live-build config ─────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ lb config \
     --bootappend-live-failsafe "boot=live components memtest noapic noapm nodma nomce nolapic nosmp nosplash vga=normal" \
     --memtest none \
     --win32-loader false \
+    --hdd-label "SHADOWKEY" \
     --iso-volume "ShadowKey" \
     --image-name "shadowkey" \
     --bootloaders "grub-efi,grub-pc" \
