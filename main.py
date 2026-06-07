@@ -1090,10 +1090,15 @@ async def wake_machine(request: Request, machine_id: str):
     try:
         mac_bytes = bytes.fromhex(mac.replace(":", "").replace("-", ""))
         magic = b'\xff' * 6 + mac_bytes * 16
+        import ipaddress
+        net = ipaddress.IPv4Network(NETWORK_SUBNET, strict=False)
+        broadcast = str(net.broadcast_address)
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.sendto(magic, ('<broadcast>', 9))
-        return {"ok": True, "mac": mac}
+            for port in (7, 9):
+                for _ in range(3):
+                    s.sendto(magic, (broadcast, port))
+        return {"ok": True, "mac": mac, "broadcast": broadcast}
     except Exception as e:
         return {"error": str(e)}
 
