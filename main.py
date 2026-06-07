@@ -1307,3 +1307,82 @@ async def account_info(request: Request):
         "machine_count": len(db.get_machines(user["id"])),
         "machine_limit": 10 if db.is_pro(user) else 3,
     }
+
+
+# ── ShadowBridge AI Orchestration ────────────────────────────────────────────
+
+_ai_tasks: dict = {}   # in-memory store; swap for DB when scaling
+
+
+def _new_task_id() -> str:
+    return uuid.uuid4().hex[:12]
+
+
+@app.post("/api/ai/task")
+async def ai_task_create(request: Request, payload: Dict = Body(...)):
+    user = _get_user(request)
+    agent_token = request.headers.get("X-Agent-Token", "")
+    if not user and not agent_token:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+
+    tid = _new_task_id()
+    _ai_tasks[tid] = {
+        "id":      tid,
+        "type":    payload.get("type", "general"),
+        "prompt":  payload.get("prompt", ""),
+        "system":  payload.get("system", ""),
+        "target":  payload.get("target", "any"),
+        "status":  "pending",
+        "result":  None,
+        "model":   None,
+        "machine": None,
+        "elapsed": None,
+        "created": int(time.time()),
+    }
+    return {"id": tid, "status": "pending"}
+
+
+@app.get("/api/ai/task/next")
+async def ai_task_next(request: Request, machine: str = "any"):
+    token = request.headers.get("X-Agent-Token", "")
+    if not token:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    for tid, task in _ai_tasks.items():
+        if task["status"] == "pending":
+            if task["target"] in ("any", machine):
+                return task
+    return {}
+
+
+@app.get("/api/ai/task/{tid}")
+async def ai_task_get(request: Request, tid: str):
+    user = _get_user(request)
+    token = request.headers.get("X-Agent-Token", "")
+    if not user and not token:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    task = _ai_tasks.get(tid)
+    if not task:
+        return JSONResponse({"error": "Nem található"}, status_code=404)
+    return task
+
+
+@app.patch("/api/ai/task/{tid}")
+async def ai_task_update(request: Request, tid: str, payload: Dict = Body(...)):
+    token = request.headers.get("X-Agent-Token", "")
+    if not token:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    task = _ai_tasks.get(tid)
+    if not task:
+        return JSONResponse({"error": "Nem található"}, status_code=404)
+    task.update({k: v for k, v in payload.items() if k in
+                 ("status", "result", "model", "machine", "elapsed")})
+    return {"ok": True}
+
+
+@app.get("/api/ai/tasks")
+async def ai_task_list(request: Request):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    tasks = sorted(_ai_tasks.values(), key=lambda t: t["created"], reverse=True)
+    return {"tasks": tasks[:50]}
