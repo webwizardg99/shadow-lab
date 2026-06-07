@@ -1456,3 +1456,72 @@ async def sb_telegram_set(request: Request, payload: Dict = Body(...)):
     db.create_alert("telegram.configured", "Telegram alerting configured",
                     severity="info")
     return {"ok": True}
+
+
+# ── ShadowBot endpoints ───────────────────────────────────────────────────────
+
+@app.get("/api/bots/status")
+async def bots_status(request: Request):
+    """Proxy to shadowbot_manager status API."""
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen("http://127.0.0.1:51823/status", timeout=3) as r:
+            return JSONResponse(content=json.loads(r.read()))
+    except Exception as e:
+        return {"error": str(e), "bots": {}}
+
+
+@app.get("/api/bots/sitrep")
+async def bots_sitrep(request: Request):
+    """Return Sentinel's latest situation report."""
+    if not _get_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen("http://127.0.0.1:51823/sitrep", timeout=3) as r:
+            return JSONResponse(content=json.loads(r.read()))
+    except Exception:
+        # Try reading directly from bot memory DB
+        try:
+            import sqlite3
+            conn = sqlite3.connect("/opt/shadowbridge/bot_memory.db")
+            row = conn.execute(
+                "SELECT value FROM bot_kv WHERE bot='sentinel' AND key='latest_sitrep'"
+            ).fetchone()
+            if row:
+                return JSONResponse(content=json.loads(row[0]))
+        except Exception:
+            pass
+        return {"text": "Sentinel offline", "ts": 0}
+
+
+@app.get("/api/bots/threats")
+async def bots_threats(request: Request):
+    """Return Sentinel's current threat model."""
+    if not _get_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen("http://127.0.0.1:51823/threats", timeout=3) as r:
+            return JSONResponse(content=json.loads(r.read()))
+    except Exception:
+        return {"threat_level": "UNKNOWN", "error": "Sentinel offline"}
+
+
+@app.post("/api/bots/ask")
+async def bots_ask(request: Request, payload: Dict = Body(...)):
+    """Send a direct question to the Sentinel via the task queue."""
+    if not _get_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    prompt = payload.get("prompt", "").strip()
+    if not prompt:
+        return {"error": "prompt kötelező"}
+    task_id = db.create_ai_task(
+        task_type="sentinel",
+        prompt=prompt,
+        target="sentinel",
+        system="Direct operator query.",
+    )
+    return {"ok": True, "task_id": task_id}
