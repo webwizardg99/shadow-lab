@@ -235,6 +235,22 @@ def init_shadowbridge_tables():
                 enabled INTEGER NOT NULL DEFAULT 0
             );
             INSERT OR IGNORE INTO telegram_config (id) VALUES (1);
+            CREATE TABLE IF NOT EXISTS attack_heartbeats (
+                id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                node    TEXT    NOT NULL,
+                status  TEXT    NOT NULL,
+                created INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+            );
+            CREATE TABLE IF NOT EXISTS attack_tasks (
+                id       TEXT    PRIMARY KEY,
+                type     TEXT    NOT NULL DEFAULT 'run_command',
+                payload  TEXT    NOT NULL DEFAULT '{}',
+                node     TEXT    NOT NULL DEFAULT 'attack',
+                status   TEXT    NOT NULL DEFAULT 'pending',
+                result   TEXT,
+                created  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+                updated  INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+            );
         """)
 
 
@@ -375,3 +391,106 @@ def set_telegram_config(token: str, chat_id: str, enabled: bool = True):
             "UPDATE telegram_config SET token=?, chat_id=?, enabled=? WHERE id=1",
             (token, chat_id, int(enabled))
         )
+
+
+# ── Attack node task queue ────────────────────────────────────────────────────
+
+def record_attack_heartbeat(node: str, status: dict) -> None:
+    import json as _json
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO attack_heartbeats (node, status) VALUES (?, ?)",
+            (node, _json.dumps(status, ensure_ascii=False)),
+        )
+        c.execute(
+            "DELETE FROM attack_heartbeats WHERE id NOT IN "
+            "(SELECT id FROM attack_heartbeats ORDER BY created DESC LIMIT 200)"
+        )
+
+
+def latest_attack_heartbeat(node: str) -> Optional[Dict]:
+    import json as _json
+    with _conn() as c:
+        row = c.execute(
+            "SELECT node, status, created FROM attack_heartbeats "
+            "WHERE node=? ORDER BY created DESC LIMIT 1",
+            (node,),
+        ).fetchone()
+    if not row:
+        return None
+    return {"node": row[0], "status": _json.loads(row[1]), "ts": row[2]}
+
+
+def list_attack_nodes() -> List[Dict]:
+    import json as _json
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT node, MAX(created) as last_seen "
+            "FROM attack_heartbeats GROUP BY node ORDER BY last_seen DESC"
+        ).fetchall()
+    result = []
+    for node, last_seen in rows:
+        hb = latest_attack_heartbeat(node)
+        result.append({"node": node, "last_seen": last_seen,
+                        "status": hb["status"] if hb else {}})
+    return result
+
+
+def create_attack_task(task_type: str, payload: dict, node: str = "attack") -> Dict:
+    import json as _json
+    tid = __import__("uuid").uuid4().hex[:12]
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO attack_tasks (id, type, payload, node) VALUES (?, ?, ?, ?)",
+            (tid, task_type, _json.dumps(payload, ensure_ascii=False), node),
+        )
+    return get_attack_task(tid)
+
+
+def get_attack_task(tid: str) -> Optional[Dict]:
+    import json as _json
+    with _conn() as c:
+        row = c.execute("SELECT * FROM attack_tasks WHERE id=?", (tid,)).fetchone()
+        if not row:
+            return None
+        keys = [d[0] for d in c.description]
+    d = dict(zip(keys, row))
+    for fld in ("payload", "result"):
+        if d.get(fld):
+            try:
+                d[fld] = _json.loads(d[fld])
+            except Exception:
+                pass
+    return d
+
+
+def list_attack_tasks(node: str = "attack", status: str = "pending") -> List[Dict]:
+    import json as _json
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM attack_tasks WHERE node=? AND status=? ORDER BY created",
+            (node, status),
+        ).fetchall()
+        keys = [d[0] for d in c.description]
+    result = []
+    for row in rows:
+        d = dict(zip(keys, row))
+        for fld in ("payload", "result"):
+            if d.get(fld):
+                try:
+                    d[fld] = _json.loads(d[fld])
+                except Exception:
+                    pass
+        result.append(d)
+    return result
+
+
+def complete_attack_task(tid: str, result: dict) -> bool:
+    import json as _json
+    with _conn() as c:
+        changed = c.execute(
+            "UPDATE attack_tasks SET status='done', result=?, "
+            "updated=strftime('%s','now') WHERE id=?",
+            (_json.dumps(result, ensure_ascii=False), tid),
+        ).rowcount
+    return bool(changed)

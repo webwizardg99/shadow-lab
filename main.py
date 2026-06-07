@@ -35,6 +35,7 @@ with open(CONFIG_FILE) as f:
 PORT: int               = _cfg.get("port", 8889)
 ALERT_THRESHOLDS        = _cfg.get("alerts", {"cpu": 85, "ram": 90, "disk": 90, "temp": 80})
 NETWORK_SUBNET: str     = _cfg.get("network_subnet", "192.168.1.0/24")
+NOX_ATTACK_TOKEN: str   = os.environ.get("NOX_ATTACK_TOKEN", "")
 
 COOKIE_NAME = "shadowlab_session"
 
@@ -1524,4 +1525,84 @@ async def bots_ask(request: Request, payload: Dict = Body(...)):
         target="sentinel",
         system="Direct operator query.",
     )
+    return {"ok": True, "task_id": task_id}
+
+
+# ── NOX Attack node API ───────────────────────────────────────────────────────
+
+def _auth_attack_node(request: Request) -> bool:
+    """Validate Bearer token from attack node. Falls back to permitting if
+    NOX_ATTACK_TOKEN is not configured (dev mode)."""
+    if not NOX_ATTACK_TOKEN:
+        return bool(request.headers.get("Authorization"))
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return False
+    return auth.split(" ", 1)[1].strip() == NOX_ATTACK_TOKEN
+
+
+@app.post("/api/attack/heartbeat")
+async def attack_heartbeat(request: Request):
+    """Receive status heartbeat from the NOX attack agent."""
+    if not _auth_attack_node(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        status = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    node = request.headers.get("X-Node", status.get("hostname", "attack"))
+    db.record_attack_heartbeat(node, status)
+    return {"ok": True, "node": node}
+
+
+@app.get("/api/attack/nodes")
+async def attack_nodes(request: Request):
+    """List all attack nodes that have sent a heartbeat."""
+    if not (_get_user(request) or _auth_attack_node(request)):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    return {"nodes": db.list_attack_nodes()}
+
+
+@app.get("/api/attack/tasks")
+async def attack_tasks_list(
+    request: Request,
+    node: str = "attack",
+    status: str = "pending",
+):
+    """Return queued tasks for an attack node."""
+    if not _auth_attack_node(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    tasks = db.list_attack_tasks(node=node, status=status)
+    return {"tasks": tasks}
+
+
+@app.post("/api/attack/tasks")
+async def attack_task_create(request: Request, payload: Dict = Body(...)):
+    """Enqueue a new task for an attack node (operator only)."""
+    if not _get_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    task_type = str(payload.get("type", "run_command"))
+    task_payload = payload.get("payload", {})
+    node = str(payload.get("node", "attack"))
+    if not isinstance(task_payload, dict):
+        return JSONResponse({"error": "payload must be an object"}, status_code=400)
+    task = db.create_attack_task(task_type=task_type, payload=task_payload, node=node)
+    return {"ok": True, "task": task}
+
+
+@app.post("/api/attack/tasks/{task_id}/result")
+async def attack_task_result(request: Request, task_id: str):
+    """Receive execution result from attack node."""
+    if not _auth_attack_node(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    result = body.get("result", {})
+    if not isinstance(result, dict):
+        result = {"output": str(result)}
+    ok = db.complete_attack_task(task_id, result)
+    if not ok:
+        return JSONResponse({"error": "task not found"}, status_code=404)
     return {"ok": True, "task_id": task_id}
