@@ -1,0 +1,31 @@
+name: shadowguard
+description: ShadowGuard — WiFi Evil Twin & Rogue AP Detector
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # WiFi scanning (Android platform)
+  wifi_scan: ^0.4.1
+
+  # Permission handling
+  permission_handler: ^11.3.0
+
+  # Local push notifications (threat alerts)
+  flutter_local_notifications: ^17.2.2
+
+  # Persist trusted networks
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
