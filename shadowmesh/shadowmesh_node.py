@@ -279,11 +279,18 @@ class ShadowMeshNode:
     # ── Discovery listener ────────────────────────────────────────────────────
 
     async def _multicast_listen(self):
+        # Determine the local outbound interface IP to avoid binding to all interfaces
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as _s:
+                _s.connect((MULTICAST_GROUP, MULTICAST_PORT))
+                _local_ip = _s.getsockname()[0]
+        except Exception:
+            _local_ip = "127.0.0.1"
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("0.0.0.0", MULTICAST_PORT))
+        sock.bind((_local_ip, MULTICAST_PORT))
         mreq = struct.pack("4sL", socket.inet_aton(MULTICAST_GROUP),
-                           socket.INADDR_ANY)
+                           socket.inet_aton(_local_ip))
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         sock.setblocking(False)
         loop = asyncio.get_event_loop()
