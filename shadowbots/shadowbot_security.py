@@ -45,6 +45,10 @@ Format findings as: SEVERITY | TECHNIQUE | RECOMMENDATION"""
             return
         pos = self.memory.get(SEEN_POSITION_KEY, 0)
         try:
+            file_size = SURICATA_LOG.stat().st_size
+            if pos > file_size:
+                self.log.debug(f"Suricata log rotation/truncation detected (pos={pos} > size={file_size}), resetting")
+                pos = 0
             with open(SURICATA_LOG) as f:
                 f.seek(pos)
                 new_events = []
@@ -60,12 +64,12 @@ Format findings as: SEVERITY | TECHNIQUE | RECOMMENDATION"""
                         pass
                 new_pos = f.tell()
 
+            self.memory.set(SEEN_POSITION_KEY, new_pos)
             if new_events:
-                self.memory.set(SEEN_POSITION_KEY, new_pos)
                 self.log.info(f"Read {len(new_events)} new Suricata events")
                 for ev in new_events:
                     self._process_suricata_event(ev)
-        except Exception as e:
+
             self.log.debug(f"Suricata read error: {e}")
 
     def _process_suricata_event(self, ev: dict):
