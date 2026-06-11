@@ -25,6 +25,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
 import database as db
+from shadowbridge_telegram import TelegramDispatcher, send_alert as tg_send_alert
 
 # ── Config ───────────────────────────────────────────────────────────────────
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
@@ -34,6 +35,7 @@ with open(CONFIG_FILE) as f:
 PORT: int               = _cfg.get("port", 8889)
 ALERT_THRESHOLDS        = _cfg.get("alerts", {"cpu": 85, "ram": 90, "disk": 90, "temp": 80})
 NETWORK_SUBNET: str     = _cfg.get("network_subnet", "192.168.1.0/24")
+NOX_ATTACK_TOKEN: str   = os.environ.get("NOX_ATTACK_TOKEN", "")
 
 COOKIE_NAME = "shadowlab_session"
 
@@ -353,8 +355,15 @@ async def _collect_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+    db.init_shadowbridge_tables()
     task1 = asyncio.create_task(_collect_loop())
     task2 = asyncio.create_task(_network_watcher_loop())
+    _tg_dispatcher = TelegramDispatcher(
+        get_config_fn=db.get_telegram_config,
+        list_alerts_fn=lambda: db.list_alerts(unacked_only=True),
+        ack_fn=db.ack_alert,
+    )
+    _tg_dispatcher.start()
     yield
     task1.cancel()
     task2.cancel()
@@ -1090,10 +1099,15 @@ async def wake_machine(request: Request, machine_id: str):
     try:
         mac_bytes = bytes.fromhex(mac.replace(":", "").replace("-", ""))
         magic = b'\xff' * 6 + mac_bytes * 16
+        import ipaddress
+        net = ipaddress.IPv4Network(NETWORK_SUBNET, strict=False)
+        broadcast = str(net.broadcast_address)
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.sendto(magic, ('<broadcast>', 9))
-        return {"ok": True, "mac": mac}
+            for port in (7, 9):
+                for _ in range(3):
+                    s.sendto(magic, (broadcast, port))
+        return {"ok": True, "mac": mac, "broadcast": broadcast}
     except Exception as e:
         return {"error": str(e)}
 
@@ -1302,3 +1316,293 @@ async def account_info(request: Request):
         "machine_count": len(db.get_machines(user["id"])),
         "machine_limit": 10 if db.is_pro(user) else 3,
     }
+
+
+# ── ShadowBridge AI Orchestration ────────────────────────────────────────────
+
+def _auth_agent_or_user(request: Request) -> bool:
+    return bool(_get_user(request) or request.headers.get("X-Agent-Token"))
+
+
+@app.post("/api/ai/task")
+async def ai_task_create(request: Request, payload: Dict = Body(...)):
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    tid  = uuid.uuid4().hex[:12]
+    task = db.create_ai_task(
+        tid,
+        task_type=payload.get("type", "general"),
+        prompt=payload.get("prompt", ""),
+        system=payload.get("system", ""),
+        target=payload.get("target", "any"),
+    )
+    return {"id": tid, "status": "pending"}
+
+
+@app.get("/api/ai/task/next")
+async def ai_task_next(request: Request, machine: str = "any"):
+    if not request.headers.get("X-Agent-Token"):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    task = db.next_ai_task(machine)
+    return task or {}
+
+
+@app.get("/api/ai/task/{tid}")
+async def ai_task_get(request: Request, tid: str):
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    task = db.get_ai_task(tid)
+    return task or JSONResponse({"error": "Nem található"}, status_code=404)
+
+
+@app.patch("/api/ai/task/{tid}")
+async def ai_task_update(request: Request, tid: str, payload: Dict = Body(...)):
+    if not request.headers.get("X-Agent-Token"):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    ok = db.update_ai_task(tid, **payload)
+    return {"ok": ok} if ok else JSONResponse({"error": "Nem található"}, status_code=404)
+
+
+@app.get("/api/ai/tasks")
+async def ai_task_list(request: Request):
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    return {"tasks": db.list_ai_tasks(50)}
+
+
+# ── ShadowBridge Alerts ───────────────────────────────────────────────────────
+
+@app.post("/api/sb/alert")
+async def sb_alert_create(request: Request, payload: Dict = Body(...)):
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    alert = db.create_alert(
+        alert_type=payload.get("type", "unknown"),
+        message=payload.get("message", ""),
+        severity=payload.get("severity", "info"),
+        machine=payload.get("machine") or request.headers.get("X-Machine-ID"),
+        data=payload.get("data"),
+    )
+    return {"ok": True, "id": alert["id"]}
+
+
+@app.get("/api/sb/alerts")
+async def sb_alert_list(request: Request, unacked: str = "0"):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    return {"alerts": db.list_alerts(100, unacked_only=(unacked == "1"))}
+
+
+@app.post("/api/sb/alerts/{alert_id}/ack")
+async def sb_alert_ack(request: Request, alert_id: str):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    db.ack_alert(alert_id)
+    return {"ok": True}
+
+
+# ── ShadowBridge Recon ────────────────────────────────────────────────────────
+
+@app.post("/api/sb/recon")
+async def sb_recon_save(request: Request, payload: Dict = Body(...)):
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    machine = payload.get("machine") or request.headers.get("X-Machine-ID", "unknown")
+    db.save_recon(
+        machine=machine,
+        mode=payload.get("mode", "home"),
+        score=payload.get("corp_score", 0),
+        subnet=payload.get("subnet", ""),
+        host_count=payload.get("host_count", 0),
+        evidence=payload.get("evidence", []),
+        raw=payload,
+    )
+    return {"ok": True}
+
+
+@app.get("/api/sb/recon/{machine}")
+async def sb_recon_get(request: Request, machine: str):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    result = db.latest_recon(machine)
+    return result or {"mode": "unknown", "score": 0}
+
+
+# ── ShadowBridge Telegram Config ─────────────────────────────────────────────
+
+@app.get("/api/sb/telegram")
+async def sb_telegram_get(request: Request):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    cfg = db.get_telegram_config()
+    return {"enabled": bool(cfg.get("enabled")), "chat_id": cfg.get("chat_id", ""),
+            "configured": bool(cfg.get("token"))}
+
+
+@app.post("/api/sb/telegram")
+async def sb_telegram_set(request: Request, payload: Dict = Body(...)):
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    token   = payload.get("token", "").strip()
+    chat_id = payload.get("chat_id", "").strip()
+    enabled = bool(payload.get("enabled", True))
+    if not token or not chat_id:
+        return {"error": "token és chat_id kötelező"}
+    db.set_telegram_config(token, chat_id, enabled)
+    db.create_alert("telegram.configured", "Telegram alerting configured",
+                    severity="info")
+    return {"ok": True}
+
+
+# ── ShadowBot endpoints ───────────────────────────────────────────────────────
+
+@app.get("/api/bots/status")
+async def bots_status(request: Request):
+    """Proxy to shadowbot_manager status API."""
+    if not _auth_agent_or_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen("http://127.0.0.1:51823/status", timeout=3) as r:
+            return JSONResponse(content=json.loads(r.read()))
+    except Exception:
+        return {"error": "ShadowBot manager unreachable", "bots": {}}
+
+
+@app.get("/api/bots/sitrep")
+async def bots_sitrep(request: Request):
+    """Return Sentinel's latest situation report."""
+    if not _get_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen("http://127.0.0.1:51823/sitrep", timeout=3) as r:
+            return JSONResponse(content=json.loads(r.read()))
+    except Exception:
+        # Try reading directly from bot memory DB
+        try:
+            import sqlite3
+            conn = sqlite3.connect("/opt/shadowbridge/bot_memory.db")
+            row = conn.execute(
+                "SELECT value FROM bot_kv WHERE bot='sentinel' AND key='latest_sitrep'"
+            ).fetchone()
+            if row:
+                return JSONResponse(content=json.loads(row[0]))
+        except Exception:
+            pass
+        return {"text": "Sentinel offline", "ts": 0}
+
+
+@app.get("/api/bots/threats")
+async def bots_threats(request: Request):
+    """Return Sentinel's current threat model."""
+    if not _get_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen("http://127.0.0.1:51823/threats", timeout=3) as r:
+            return JSONResponse(content=json.loads(r.read()))
+    except Exception:
+        return {"threat_level": "UNKNOWN", "error": "Sentinel offline"}
+
+
+@app.post("/api/bots/ask")
+async def bots_ask(request: Request, payload: Dict = Body(...)):
+    """Send a direct question to the Sentinel via the task queue."""
+    if not _get_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    prompt = payload.get("prompt", "").strip()
+    if not prompt:
+        return {"error": "prompt kötelező"}
+    task_id = db.create_ai_task(
+        task_type="sentinel",
+        prompt=prompt,
+        target="sentinel",
+        system="Direct operator query.",
+    )
+    return {"ok": True, "task_id": task_id}
+
+
+# ── NOX Attack node API ───────────────────────────────────────────────────────
+
+def _auth_attack_node(request: Request) -> bool:
+    """Validate Bearer token from attack node. Falls back to permitting if
+    NOX_ATTACK_TOKEN is not configured (dev mode)."""
+    if not NOX_ATTACK_TOKEN:
+        return bool(request.headers.get("Authorization"))
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return False
+    return auth.split(" ", 1)[1].strip() == NOX_ATTACK_TOKEN
+
+
+@app.post("/api/attack/heartbeat")
+async def attack_heartbeat(request: Request):
+    """Receive status heartbeat from the NOX attack agent."""
+    if not _auth_attack_node(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        status = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    node = request.headers.get("X-Node", status.get("hostname", "attack"))
+    db.record_attack_heartbeat(node, status)
+    return {"ok": True, "node": node}
+
+
+@app.get("/api/attack/nodes")
+async def attack_nodes(request: Request):
+    """List all attack nodes that have sent a heartbeat."""
+    if not (_get_user(request) or _auth_attack_node(request)):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    return {"nodes": db.list_attack_nodes()}
+
+
+@app.get("/api/attack/tasks")
+async def attack_tasks_list(
+    request: Request,
+    node: str = "attack",
+    status: str = "pending",
+):
+    """Return queued tasks for an attack node."""
+    if not _auth_attack_node(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    tasks = db.list_attack_tasks(node=node, status=status)
+    return {"tasks": tasks}
+
+
+@app.post("/api/attack/tasks")
+async def attack_task_create(request: Request, payload: Dict = Body(...)):
+    """Enqueue a new task for an attack node (operator only)."""
+    if not _get_user(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    task_type = str(payload.get("type", "run_command"))
+    task_payload = payload.get("payload", {})
+    node = str(payload.get("node", "attack"))
+    if not isinstance(task_payload, dict):
+        return JSONResponse({"error": "payload must be an object"}, status_code=400)
+    task = db.create_attack_task(task_type=task_type, payload=task_payload, node=node)
+    return {"ok": True, "task": task}
+
+
+@app.post("/api/attack/tasks/{task_id}/result")
+async def attack_task_result(request: Request, task_id: str):
+    """Receive execution result from attack node."""
+    if not _auth_attack_node(request):
+        return JSONResponse({"error": "Jogosulatlan"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    result = body.get("result", {})
+    if not isinstance(result, dict):
+        result = {"output": str(result)}
+    ok = db.complete_attack_task(task_id, result)
+    if not ok:
+        return JSONResponse({"error": "task not found"}, status_code=404)
+    return {"ok": True, "task_id": task_id}

@@ -1,0 +1,18 @@
+[Unit]
+Description=ShadowBridge AI Agent
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+User=wizardg
+WorkingDirectory=/opt/shadowbridge
+EnvironmentFile=/opt/shadowbridge/.env
+ExecStart=/usr/bin/python3 /opt/shadowbridge/shadowbridge_agent.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

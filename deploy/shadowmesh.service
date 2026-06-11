@@ -1,0 +1,17 @@
+[Unit]
+Description=ShadowMesh Overlay Network Node
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/shadowmesh
+ExecStart=/usr/bin/python3 /opt/shadowmesh/shadowmesh_node.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
