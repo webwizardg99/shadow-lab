@@ -498,11 +498,14 @@ class WifiDetector {
 
       // KARMA: 3+ APs with same SSID
       if (aps.length >= 3) {
-        onThreat?.call(ThreatEvent(
-          type: 'KARMA', severity: 'high',
-          ssid: ssid, bssid: aps.first.bssid,
-          message: '${aps.length} APs broadcasting "$ssid" — possible KARMA attack',
-        ));
+        final channels = aps.map((a) => a.frequency ~/ 5).toSet();
+        if (channels.length == 1) {  // All on same channel
+          onThreat?.call(ThreatEvent(
+            type: 'KARMA', severity: 'high',
+            ssid: ssid, bssid: aps.first.bssid,
+            message: '${aps.length} APs broadcasting "$ssid" — possible KARMA attack',
+          ));
+        }
       }
     }
 
