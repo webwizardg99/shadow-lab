@@ -26,7 +26,7 @@ _COLS=$(tput cols 2>/dev/null || echo 80)
 
 _line() {
     # Teljes szélességű vonal adott karakterrel
-    local char="${1:─}"
+    local char="${1:-─}"
     local color="${2:-$_C_RED}"
     printf "${color}"
     printf '%*s' "$_COLS" '' | tr ' ' "$char"
@@ -203,7 +203,7 @@ _set_prompt() {
     rlabel=$(_role_label "$role" | sed 's/[^A-Z ]//g' | xargs)  # csak szöveg
 
     # Kétszintű prompt (mint az X-FILES-nél)
-    PS1="\[${rcolor}\][SB·${rlabel}]\[${_C_RST}\]}\[${_C_YLW}\]]\[${_C_RST}\]}-\[\033[38;5;39m\][\[${_C_BLD}\]\u\[${_C_RST}\]\[\033[38;5;39m\]@\[\033[38;5;39m\]\h\[${_C_RST}\]]-[\[${_C_CYN}\]\w\[${_C_RST}\]]\n\[${rcolor}\][>]\[${_C_RST}\]\\$ "
+    PS1="\[${rcolor}\][SB·${rlabel}]\[${_C_RST}\]\[${_C_YLW}\]]\[${_C_RST}\]-\[\033[38;5;39m\][\[${_C_BLD}\]\u\[${_C_RST}\]\[\033[38;5;39m\]@\[\033[38;5;39m\]\h\[${_C_RST}\]]-[\[${_C_CYN}\]\w\[${_C_RST}\]]\n\[${rcolor}\][>]\[${_C_RST}\]\\$ "
 }
 
 # ── Futtatás ──────────────────────────────────────────────────────────────────
